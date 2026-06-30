@@ -1,0 +1,152 @@
+@custom-variant dark (&:is(.dark *));
+
+/* ─────────────────────────────────────────────────────────────────────────
+   TACTUS — Smart Home Design System
+   Token layer extracted from the Figma Make prototype (Create_Interactive_
+   Light_Switch). This file replaces the stock shadcn theme.css. Every value
+   below was a hardcoded literal in App.tsx — they now live in one place.
+   Dark theme is primary/default. Light "day" theme is a planned second pass.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root,
+.dark {
+  /* ── Surfaces ──────────────────────────────────────────────────────── */
+  --tactus-bg-base:        #0b0c10;   /* card "off" state, app background */
+  --tactus-bg-raised:      #161922;   /* card "on" / active surface */
+  --tactus-bg-recessed:    #0f1117;   /* solar/energy panel background */
+  --tactus-bg-track:       rgba(255, 255, 255, 0.06); /* slider track, inactive fill */
+  --tactus-bg-hairline:    rgba(255, 255, 255, 0.02);  /* faintest icon-chip bg, off state */
+
+  /* ── Borders ───────────────────────────────────────────────────────── */
+  --tactus-border-default: #242936;
+  --tactus-border-subtle:  #1e2530;
+  --tactus-border-error:   #EF4444;
+
+  /* ── Text ──────────────────────────────────────────────────────────── */
+  --tactus-text-primary:   #f8fafc;   /* device names, on-state labels, big numerals */
+  --tactus-text-secondary: #94a3b8;   /* off-state device names, body copy */
+  --tactus-text-muted:     #475569;   /* off-state labels, helper text, units */
+  --tactus-text-faint:     #334155;   /* eyebrow labels ("NOW", "TODAY", "CO₂") */
+
+  /* ── Semantic state colours ───────────────────────────────────────────
+     These are the system's vocabulary — colour means device/data state,
+     never decoration. Reuse these tokens, never re-introduce raw hex. ── */
+  --tactus-amber:          #F59E0B;   /* primary active/on accent · solar */
+  --tactus-green:          #22C55E;   /* good / comfortable / success */
+  --tactus-blue:           #3B82F6;   /* informational · Tesla/EV */
+  --tactus-blue-light:     #93C5FD;   /* blue accent, lighter step */
+  --tactus-red:            #EF4444;   /* error / unreachable / hazardous */
+  --tactus-pink:           #FB7185;   /* unhealthy / warning-adjacent */
+  --tactus-cyan-white:     #E2F1FF;   /* "cool white" light colour swatch */
+  --tactus-warm-white:     #FFF9E5;   /* "warm white" light colour swatch */
+
+  /* Convenience aliases — use these in components instead of raw colour tokens */
+  --tactus-state-on:         var(--tactus-amber);
+  --tactus-state-off:        var(--tactus-text-muted);
+  --tactus-state-error:      var(--tactus-red);
+  --tactus-state-good:       var(--tactus-green);
+  --tactus-state-warn:       var(--tactus-pink);
+  --tactus-energy-solar:     var(--tactus-amber);
+  --tactus-energy-ev:        var(--tactus-blue);
+  --tactus-energy-battery:   var(--tactus-green);
+
+  /* ── Typography ────────────────────────────────────────────────────── */
+  /* Per Josh: keep the Figma Make font pairing as-is. */
+  --tactus-font-sans: 'Instrument Sans', sans-serif;
+  --tactus-font-mono: 'Geist Mono', monospace;
+
+  --tactus-font-weight-normal:   400;
+  --tactus-font-weight-semibold: 600;
+  --tactus-font-weight-bold:     700;
+
+  /* Type scale observed in source. "Glance" sizes are the large live
+     numerals (solar kW, sensor readouts) — always font-mono. */
+  --tactus-text-eyebrow:   10px;  /* uppercase micro-labels, tracking-wider */
+  --tactus-text-xs:        11px;  /* badges, pills, secondary labels */
+  --tactus-text-sm:        12px;  /* helper copy, captions */
+  --tactus-text-base:      13px;  /* body, slider value labels */
+  --tactus-text-md:        14px;  /* card sub-headers */
+  --tactus-text-lg:        16px;  /* card titles (compact cards) */
+  --tactus-text-xl:        18px;  /* card titles (hero cards) */
+  --tactus-text-glance-sm: 22px;  /* small live readout (motion sensor) */
+  --tactus-text-glance-md: 40px;  /* medium live readout (AQI) */
+  --tactus-text-glance-lg: 48px;  /* large live readout (temp/humidity) */
+
+  /* ── Radius ────────────────────────────────────────────────────────── */
+  /* Generous, soft, physical — never sharp. Bigger surface = bigger radius. */
+  --tactus-radius-sm:  10px;  /* icon chips */
+  --tactus-radius-md:  12px;  /* icon chips (large), pills */
+  --tactus-radius-lg:  20px;  /* nested toggle well (compact card) */
+  --tactus-radius-xl:  24px;  /* compact panel cards, nested toggle well (hero) */
+  --tactus-radius-2xl: 28px;  /* switch/solar cards */
+  --tactus-radius-3xl: 32px;  /* hero light cards */
+  --tactus-radius-full: 9999px;
+
+  /* ── Elevation ─────────────────────────────────────────────────────── */
+  /* No flat drop-shadows — elevation reads as a soft coloured glow keyed
+     to the card's own accent colour, only present in "on"/active states.
+     Pattern: 0 20px 30-40px 0 {accent at 4-6% alpha}                    */
+  --tactus-glow-strength-card:   0.04;
+  --tactus-glow-strength-hero:   0.06;
+  --tactus-glow-strength-error:  0.12;
+  --tactus-glow-strength-pill:   0.5;   /* slider thumb / active-dot glow */
+  --tactus-inset-shadow: inset 0 -4px 8px 0 rgba(0, 0, 0, 0.5); /* pressed/on toggle well */
+
+  /* ── Motion ────────────────────────────────────────────────────────── */
+  --tactus-motion-state-change:   0.4s ease;   /* card bg on toggle */
+  --tactus-motion-press:          0.15s ease;  /* tile depress */
+  --tactus-motion-value:          0.3s ease;   /* live numeral/slider transitions */
+  --tactus-motion-pending-pulse:  2s ease-in-out infinite; /* ambient "awaiting confirmation" breathe */
+
+  /* ── Layout (reference, not exhaustive) ───────────────────────────── */
+  --tactus-radius-base: 0.625rem; /* fallback for any remaining shadcn primitives in use */
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Tailwind v4 @theme bridge — exposes tokens as utility classes
+   (e.g. bg-tactus-raised, text-tactus-primary, rounded-tactus-3xl)
+   ───────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --color-tactus-bg-base:        var(--tactus-bg-base);
+  --color-tactus-bg-raised:      var(--tactus-bg-raised);
+  --color-tactus-bg-recessed:    var(--tactus-bg-recessed);
+
+  --color-tactus-border-default: var(--tactus-border-default);
+  --color-tactus-border-subtle:  var(--tactus-border-subtle);
+  --color-tactus-border-error:   var(--tactus-border-error);
+
+  --color-tactus-text-primary:   var(--tactus-text-primary);
+  --color-tactus-text-secondary: var(--tactus-text-secondary);
+  --color-tactus-text-muted:     var(--tactus-text-muted);
+  --color-tactus-text-faint:     var(--tactus-text-faint);
+
+  --color-tactus-amber: var(--tactus-amber);
+  --color-tactus-green: var(--tactus-green);
+  --color-tactus-blue:  var(--tactus-blue);
+  --color-tactus-red:   var(--tactus-red);
+  --color-tactus-pink:  var(--tactus-pink);
+
+  --font-tactus-sans: var(--tactus-font-sans);
+  --font-tactus-mono: var(--tactus-font-mono);
+
+  --radius-tactus-sm:  var(--tactus-radius-sm);
+  --radius-tactus-md:  var(--tactus-radius-md);
+  --radius-tactus-lg:  var(--tactus-radius-lg);
+  --radius-tactus-xl:  var(--tactus-radius-xl);
+  --radius-tactus-2xl: var(--tactus-radius-2xl);
+  --radius-tactus-3xl: var(--tactus-radius-3xl);
+}
+
+@layer base {
+  body {
+    background: var(--tactus-bg-base);
+    color: var(--tactus-text-primary);
+    font-family: var(--tactus-font-sans);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Helper: alpha-blended accent glow, generated at runtime in JS today via
+   withAlpha(hex, alpha) in App.tsx. Keep that helper — token values above
+   are the canonical hex source it should read from, not re-hardcode.
+   ───────────────────────────────────────────────────────────────────────── */
