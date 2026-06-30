@@ -109,7 +109,7 @@ function AlertIcon({ stroke }: { stroke: string }) {
   return <svg className="size-full" fill="none" viewBox="0 0 10 16.668"><g clipPath="url(#ac)"><path d={svgPaths.p1eb93300} stroke={stroke} strokeLinecap="round" strokeWidth="2" /></g><defs><clipPath id="ac"><rect width="10" height="16.668" fill="white" /></clipPath></defs></svg>;
 }
 function ChevronLeft() {
-  return <svg className="size-full" fill="none" viewBox="0 0 24 24"><path d="M15 18L9 12L15 6" stroke="#94a3b8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>;
+  return <svg className="size-full" fill="none" viewBox="0 0 24 24"><path d="M15 18L9 12L15 6" stroke="var(--tactus-text-secondary)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>;
 }
 
 // ─── Brightness slider ────────────────────────────────────────────────────────
@@ -132,14 +132,14 @@ function BrightnessSlider({ value, onChange, accent }: { value: number; onChange
   }, [compute]);
 
   return (
-    <div ref={trackRef} className="relative h-[12px] rounded-full w-full cursor-pointer select-none" style={{ background: "rgba(255,255,255,0.06)" }}
+    <div ref={trackRef} className="relative h-[12px] rounded-full w-full cursor-pointer select-none" style={{ background: "var(--tactus-bg-track)" }}
       onMouseDown={(e) => { dragging.current = true; compute(e.clientX); }}
       onTouchStart={(e) => { dragging.current = true; compute(e.touches[0].clientX); }}
       onClick={(e) => compute(e.clientX)}>
       <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${value}%`, background: accent, boxShadow: `0 0 12px 0 ${withAlpha(accent, 0.5)}` }} />
       <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-[24px]" style={{ left: `${value}%` }}>
         <svg viewBox="0 0 32 32" fill="none" className="size-full drop-shadow-md">
-          <circle cx="16" cy="16" r="12" fill="#F8FAFC" /><circle cx="16" cy="16" r="11" stroke={accent} strokeWidth="2" />
+          <circle cx="16" cy="16" r="12" fill="var(--tactus-text-primary)" /><circle cx="16" cy="16" r="11" stroke={accent} strokeWidth="2" />
         </svg>
       </div>
     </div>
@@ -152,49 +152,49 @@ function LightCard({ state, onChange }: { state: LightState; onChange: (p: Parti
   const { cardState, panel, brightness, selectedColor, device } = state;
   const isOn = cardState === "on", isOff = cardState === "off", isError = cardState === "error";
   const accent = isError ? "#EF4444" : isOn ? selectedColor.hex : "#475569";
-  const accentLight = isOn ? withAlpha(accent, 0.13) : "rgba(255,255,255,0.02)";
+  const accentLight = isOn ? withAlpha(accent, 0.13) : "var(--tactus-bg-hairline)";
 
   return (
-    <motion.div className="relative flex flex-col items-start justify-between p-[24px] rounded-[32px] w-full"
-      style={{ minHeight: 480, background: isOff ? "#0b0c10" : "#161922", boxShadow: isError ? "0 0 28px 0 rgba(239,68,68,0.12)" : isOn ? `0 20px 30px 0 ${withAlpha(accent, 0.04)}` : "none" }}
-      animate={{ background: isOff ? "#0b0c10" : "#161922" }} transition={{ duration: 0.4 }}
+    <motion.div className="relative flex flex-col items-start justify-between p-[24px] rounded-tactus-3xl w-full"
+      style={{ minHeight: 480, background: isOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)", boxShadow: isError ? `0 0 28px 0 ${withAlpha("#EF4444", 0.12)}` : isOn ? `0 20px 30px 0 ${withAlpha(accent, 0.04)}` : "none" }}
+      animate={{ background: isOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)" }} transition={{ duration: 0.4 }}
       onClick={() => onChange({ panel: "summary" })}>
-      <div aria-hidden className="absolute inset-0 rounded-[32px] pointer-events-none" style={{ border: isError ? "1px solid #EF4444" : "1px solid #242936" }} />
+      <div aria-hidden className="absolute inset-0 rounded-tactus-3xl pointer-events-none" style={{ border: isError ? "1px solid var(--tactus-red)" : "1px solid var(--tactus-border-default)" }} />
 
       {/* Header */}
       <div className="flex items-center justify-between w-full shrink-0">
         <div className="flex items-center gap-[12px]">
-          <div className="flex items-center justify-center rounded-[12px] size-[40px] shrink-0" style={{ background: accentLight }}>
+          <div className="flex items-center justify-center rounded-tactus-md size-[40px] shrink-0" style={{ background: accentLight }}>
             {isError
-              ? <div className="size-[20px] overflow-clip relative"><div className="absolute top-[8.33%] bottom-[8.33%] left-1/4 right-1/4"><AlertIcon stroke="#EF4444" /></div></div>
-              : <div className="size-[20px]"><LightbulbIcon stroke={isOff ? "#475569" : accent} /></div>}
+              ? <div className="size-[20px] overflow-clip relative"><div className="absolute top-[8.33%] bottom-[8.33%] left-1/4 right-1/4"><AlertIcon stroke="var(--tactus-red)" /></div></div>
+              : <div className="size-[20px]"><LightbulbIcon stroke={isOff ? "var(--tactus-text-muted)" : accent} /></div>}
           </div>
           <div className="flex flex-col gap-[2px]">
-            <p className="text-[18px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: isOff ? "#94a3b8" : "#f8fafc" }}>{device}</p>
-            {isError && <p className="text-[11px] font-bold uppercase leading-none mt-[2px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#EF4444" }}>UNREACHABLE</p>}
+            <p className="text-[18px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-secondary)" : "var(--tactus-text-primary)" }}>{device}</p>
+            {isError && <p className="text-[11px] font-bold uppercase leading-none mt-[2px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-red)" }}>UNREACHABLE</p>}
           </div>
         </div>
         <div className="flex items-center px-[10px] py-[4px] rounded-full relative shrink-0" style={{ background: accentLight }}>
           <div aria-hidden className="absolute inset-0 rounded-full pointer-events-none" style={{ border: `1px solid ${withAlpha(accent, 0.25)}` }} />
-          <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: isOff ? "#475569" : accent }}>{isError ? "ERROR" : isOn ? "ON" : "OFF"}</p>
+          <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>{isError ? "ERROR" : isOn ? "ON" : "OFF"}</p>
         </div>
       </div>
 
       {/* Rocker */}
       <div className="flex items-center justify-center w-full shrink-0">
-        <div className="relative flex flex-col items-center justify-center p-[8px] rounded-[24px]" style={{ width: 120, height: 180, background: "#0b0c10", border: "2px solid #242936" }}>
+        <div className="relative flex flex-col items-center justify-center p-[8px] rounded-tactus-xl" style={{ width: 120, height: 180, background: "var(--tactus-bg-base)", border: "2px solid var(--tactus-border-default)" }}>
           <div className="flex flex-col gap-[2px] w-full flex-1 overflow-clip rounded-[18px]">
-            <motion.button className="flex flex-1 flex-col items-center justify-center w-full cursor-pointer min-h-0" animate={{ background: isOn ? accent : "#242936" }} transition={{ duration: 0.25 }} whileTap={{ scale: 0.97 }}
+            <motion.button className="flex flex-1 flex-col items-center justify-center w-full cursor-pointer min-h-0" animate={{ background: isOn ? accent : "var(--tactus-border-default)" }} transition={{ duration: 0.25 }} whileTap={{ scale: 0.97 }}
               onClick={(e) => { e.stopPropagation(); if (!isError) onChange({ cardState: "on" }); }} disabled={isError}>
-              <p className="text-[12px] font-bold uppercase leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: isOn ? "#0b0c10" : "#475569" }}>ON</p>
+              <p className="text-[12px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOn ? "var(--tactus-bg-base)" : "var(--tactus-text-muted)" }}>ON</p>
             </motion.button>
-            <motion.button className="flex flex-1 flex-col items-center justify-center w-full relative cursor-pointer min-h-0" style={{ background: "#242936" }} whileTap={{ scale: 0.97 }}
+            <motion.button className="flex flex-1 flex-col items-center justify-center w-full relative cursor-pointer min-h-0" style={{ background: "var(--tactus-border-default)" }} whileTap={{ scale: 0.97 }}
               onClick={(e) => { e.stopPropagation(); if (!isError) onChange({ cardState: "off", panel: "summary" }); }} disabled={isError}>
-              {isOn && <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 -4px 8px 0 rgba(0,0,0,0.5)" }} />}
-              <p className="text-[12px] font-bold uppercase leading-none relative" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>OFF</p>
+              {isOn && <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "var(--tactus-inset-shadow)" }} />}
+              <p className="text-[12px] font-bold uppercase leading-none relative" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>OFF</p>
             </motion.button>
-            {!isOn && !isError && <div className="absolute left-[12px] right-[12px] top-1/2 -translate-y-1/2 h-px opacity-35 pointer-events-none" style={{ background: "rgba(255,255,255,0.08)" }} />}
-            {isError && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="size-[22px]"><WifiOffIcon stroke="#EF4444" /></div></div>}
+            {!isOn && !isError && <div className="absolute left-[12px] right-[12px] top-1/2 -translate-y-1/2 h-px opacity-35 pointer-events-none" style={{ background: "var(--tactus-border-overlay)" }} />}
+            {isError && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="size-[22px]"><WifiOffIcon stroke="var(--tactus-red)" /></div></div>}
           </div>
         </div>
       </div>
@@ -205,38 +205,38 @@ function LightCard({ state, onChange }: { state: LightState; onChange: (p: Parti
           {isError ? (
             <motion.div key="err" className="flex flex-col gap-[12px]" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
               <div className="flex flex-col gap-[6px]">
-                <p className="text-[13px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#EF4444" }}>Device not responding</p>
-                <p className="text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>Check connection and try again.</p>
+                <p className="text-[13px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-red)" }}>Device not responding</p>
+                <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Check connection and try again.</p>
               </div>
-              <button onClick={() => onChange({ cardState: "on" })} className="flex items-center justify-center px-[14px] h-[36px] rounded-full cursor-pointer" style={{ background: "#0b0c10", border: "1px solid #EF4444" }}>
-                <p className="text-[12px] font-bold uppercase leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#EF4444" }}>RETRY</p>
+              <button onClick={() => onChange({ cardState: "on" })} className="flex items-center justify-center px-[14px] h-[36px] rounded-full cursor-pointer" style={{ background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-red)" }}>
+                <p className="text-[12px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-red)" }}>RETRY</p>
               </button>
             </motion.div>
           ) : isOff ? (
             <motion.div key="off" className="flex items-start justify-center w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
               <div className="flex gap-[40px] items-center justify-center flex-1">
-                <div className="size-[32px]"><SunIcon stroke="#242936" size={32} /></div>
-                <div className="size-[32px] rounded-full" style={{ background: "#242936" }} />
+                <div className="size-[32px]"><SunIcon stroke="var(--tactus-border-default)" size={32} /></div>
+                <div className="size-[32px] rounded-full" style={{ background: "var(--tactus-border-default)" }} />
               </div>
             </motion.div>
           ) : panel === "summary" ? (
             <motion.div key="sum" className="flex items-center justify-center w-full h-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
               <div className="flex gap-[40px] items-center justify-center flex-1">
                 <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => onChange({ panel: "brightness" })}>
-                  <div className="size-[32px]"><SunIcon stroke="#94A3B8" size={32} /></div>
-                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>{brightness}%</p>
+                  <div className="size-[32px]"><SunIcon stroke="var(--tactus-text-secondary)" size={32} /></div>
+                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{brightness}%</p>
                 </button>
                 <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => onChange({ panel: "color" })}>
                   <div className="size-[32px] rounded-full" style={{ background: selectedColor.hex }} />
-                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>{selectedColor.label.split(" ")[0]}</p>
+                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{selectedColor.label.split(" ")[0]}</p>
                 </button>
               </div>
             </motion.div>
           ) : panel === "brightness" ? (
             <motion.div key="br" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
               <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => onChange({ panel: "summary" })}>
-                <div className="size-[16px]"><SunIcon stroke="#94A3B8" size={16} /></div>
-                <p style={{ fontFamily: "'Geist Mono', monospace", color: "#f8fafc" }}>
+                <div className="size-[16px]"><SunIcon stroke="var(--tactus-text-secondary)" size={16} /></div>
+                <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
                   <span style={{ fontSize: 24, fontWeight: 600 }}>{brightness}</span>
                   <span style={{ fontSize: 14, fontWeight: 600 }}> %</span>
                 </p>
@@ -256,7 +256,7 @@ function LightCard({ state, onChange }: { state: LightState; onChange: (p: Parti
                   </button>
                 ))}
               </div>
-              <p className="text-[13px] font-normal leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>{selectedColor.label}</p>
+              <p className="text-[13px] font-normal leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{selectedColor.label}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -272,35 +272,35 @@ function SwitchCard({ state, onChange }: { state: SwitchState; onChange: (p: Par
   const accent = isOn ? "#22C55E" : "#475569";
 
   return (
-    <div className="relative flex flex-col items-start justify-between p-[24px] rounded-[28px] w-full" style={{ background: isOn ? "#161922" : "#0b0c10", border: "1px solid #242936", minHeight: 260 }}>
+    <div className="relative flex flex-col items-start justify-between p-[24px] rounded-tactus-2xl w-full" style={{ background: isOn ? "var(--tactus-bg-raised)" : "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)", minHeight: 260 }}>
       {/* Header */}
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center rounded-[12px] size-[40px]" style={{ background: isOn ? withAlpha(accent, 0.13) : "rgba(255,255,255,0.02)" }}>
-            <Plug size={18} color={isOn ? accent : "#475569"} />
+          <div className="flex items-center justify-center rounded-tactus-md size-[40px]" style={{ background: isOn ? withAlpha(accent, 0.13) : "var(--tactus-bg-hairline)" }}>
+            <Plug size={18} color={isOn ? accent : "var(--tactus-text-muted)"} />
           </div>
-          <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: isOn ? "#f8fafc" : "#94a3b8" }}>{device}</p>
+          <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOn ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{device}</p>
         </div>
-        <div className="flex items-center px-[10px] py-[4px] rounded-full relative" style={{ background: isOn ? withAlpha(accent, 0.13) : "rgba(255,255,255,0.02)" }}>
+        <div className="flex items-center px-[10px] py-[4px] rounded-full relative" style={{ background: isOn ? withAlpha(accent, 0.13) : "var(--tactus-bg-hairline)" }}>
           <div aria-hidden className="absolute inset-0 rounded-full pointer-events-none" style={{ border: `1px solid ${withAlpha(accent, 0.25)}` }} />
-          <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: isOn ? accent : "#475569" }}>{isOn ? "ON" : "OFF"}</p>
+          <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOn ? accent : "var(--tactus-text-muted)" }}>{isOn ? "ON" : "OFF"}</p>
         </div>
       </div>
 
       {/* Rocker */}
       <div className="flex items-center justify-center w-full">
-        <div className="relative flex flex-col items-center justify-center p-[8px] rounded-[20px]" style={{ width: 100, height: 140, background: "#0b0c10", border: "2px solid #242936" }}>
+        <div className="relative flex flex-col items-center justify-center p-[8px] rounded-tactus-lg" style={{ width: 100, height: 140, background: "var(--tactus-bg-base)", border: "2px solid var(--tactus-border-default)" }}>
           <div className="flex flex-col gap-[2px] w-full flex-1 overflow-clip rounded-[14px]">
-            <motion.button className="flex flex-1 flex-col items-center justify-center w-full cursor-pointer min-h-0" animate={{ background: isOn ? accent : "#242936" }} transition={{ duration: 0.2 }} whileTap={{ scale: 0.97 }}
+            <motion.button className="flex flex-1 flex-col items-center justify-center w-full cursor-pointer min-h-0" animate={{ background: isOn ? accent : "var(--tactus-border-default)" }} transition={{ duration: 0.2 }} whileTap={{ scale: 0.97 }}
               onClick={() => onChange({ isOn: true, wattsNow: state.wattsNow || 45 })}>
-              <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "'Instrument Sans', sans-serif", color: isOn ? "#0b0c10" : "#475569" }}>ON</p>
+              <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "var(--tactus-font-sans)", color: isOn ? "var(--tactus-bg-base)" : "var(--tactus-text-muted)" }}>ON</p>
             </motion.button>
-            <motion.button className="flex flex-1 flex-col items-center justify-center w-full relative cursor-pointer min-h-0" style={{ background: "#242936" }} whileTap={{ scale: 0.97 }}
+            <motion.button className="flex flex-1 flex-col items-center justify-center w-full relative cursor-pointer min-h-0" style={{ background: "var(--tactus-border-default)" }} whileTap={{ scale: 0.97 }}
               onClick={() => onChange({ isOn: false, wattsNow: 0 })}>
-              {isOn && <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 -4px 8px 0 rgba(0,0,0,0.5)" }} />}
-              <p className="text-[11px] font-bold uppercase relative" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>OFF</p>
+              {isOn && <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "var(--tactus-inset-shadow)" }} />}
+              <p className="text-[11px] font-bold uppercase relative" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>OFF</p>
             </motion.button>
-            {!isOn && <div className="absolute left-[10px] right-[10px] top-1/2 -translate-y-1/2 h-px opacity-35" style={{ background: "rgba(255,255,255,0.08)" }} />}
+            {!isOn && <div className="absolute left-[10px] right-[10px] top-1/2 -translate-y-1/2 h-px opacity-35" style={{ background: "var(--tactus-border-overlay)" }} />}
           </div>
         </div>
       </div>
@@ -308,12 +308,12 @@ function SwitchCard({ state, onChange }: { state: SwitchState; onChange: (p: Par
       {/* Power stats */}
       <div className="flex items-center justify-between w-full">
         <div className="flex flex-col gap-1">
-          <p className="text-[11px] uppercase font-semibold tracking-wider" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Now</p>
-          <p style={{ fontFamily: "'Geist Mono', monospace", color: isOn ? "#f8fafc" : "#475569", fontSize: 18, fontWeight: 600 }}>{isOn ? wattsNow : 0}<span style={{ fontSize: 12, color: "#475569" }}> W</span></p>
+          <p className="text-[11px] uppercase font-semibold tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Now</p>
+          <p style={{ fontFamily: "var(--tactus-font-mono)", color: isOn ? "var(--tactus-text-primary)" : "var(--tactus-text-muted)", fontSize: 18, fontWeight: 600 }}>{isOn ? wattsNow : 0}<span style={{ fontSize: 12, color: "var(--tactus-text-muted)" }}> W</span></p>
         </div>
         <div className="flex flex-col gap-1 text-right">
-          <p className="text-[11px] uppercase font-semibold tracking-wider" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Today</p>
-          <p style={{ fontFamily: "'Geist Mono', monospace", color: "#f8fafc", fontSize: 18, fontWeight: 600 }}>{todayKwh.toFixed(1)}<span style={{ fontSize: 12, color: "#475569" }}> kWh</span></p>
+          <p className="text-[11px] uppercase font-semibold tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Today</p>
+          <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)", fontSize: 18, fontWeight: 600 }}>{todayKwh.toFixed(1)}<span style={{ fontSize: 12, color: "var(--tactus-text-muted)" }}> kWh</span></p>
         </div>
       </div>
     </div>
@@ -332,16 +332,16 @@ function SensorCard({ state }: { state: SensorState }) {
         <>
           <div className="flex items-center justify-between w-full mb-4">
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center rounded-[10px] size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
+              <div className="flex items-center justify-center rounded-tactus-sm size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
                 <Thermometer size={16} color={color} />
               </div>
-              <p className="text-[14px] font-semibold" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#94a3b8" }}>{device}</p>
+              <p className="text-[14px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)" }}>{device}</p>
             </div>
           </div>
-          <p style={{ fontFamily: "'Geist Mono', monospace", color, fontSize: 48, fontWeight: 600, lineHeight: 1 }}>
-            {data.tempC.toFixed(1)}<span style={{ fontSize: 20, color: "#475569" }}>°C</span>
+          <p style={{ fontFamily: "var(--tactus-font-mono)", color, fontSize: 48, fontWeight: 600, lineHeight: 1 }}>
+            {data.tempC.toFixed(1)}<span style={{ fontSize: 20, color: "var(--tactus-text-muted)" }}>°C</span>
           </p>
-          <p className="mt-2 text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>
+          <p className="mt-2 text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>
             {data.trend === "up" ? "↑ Rising" : data.trend === "down" ? "↓ Falling" : "→ Stable"}
           </p>
         </>
@@ -352,15 +352,15 @@ function SensorCard({ state }: { state: SensorState }) {
       return (
         <>
           <div className="flex items-center gap-2 mb-4">
-            <div className="flex items-center justify-center rounded-[10px] size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
+            <div className="flex items-center justify-center rounded-tactus-sm size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
               <Droplets size={16} color={color} />
             </div>
-            <p className="text-[14px] font-semibold" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#94a3b8" }}>{device}</p>
+            <p className="text-[14px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)" }}>{device}</p>
           </div>
-          <p style={{ fontFamily: "'Geist Mono', monospace", color, fontSize: 48, fontWeight: 600, lineHeight: 1 }}>
-            {data.humidity}<span style={{ fontSize: 20, color: "#475569" }}>%</span>
+          <p style={{ fontFamily: "var(--tactus-font-mono)", color, fontSize: 48, fontWeight: 600, lineHeight: 1 }}>
+            {data.humidity}<span style={{ fontSize: 20, color: "var(--tactus-text-muted)" }}>%</span>
           </p>
-          <p className="mt-2 text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{label}</p>
+          <p className="mt-2 text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{label}</p>
         </>
       );
     }
@@ -369,18 +369,18 @@ function SensorCard({ state }: { state: SensorState }) {
       return (
         <>
           <div className="flex items-center gap-2 mb-4">
-            <div className="flex items-center justify-center rounded-[10px] size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
+            <div className="flex items-center justify-center rounded-tactus-sm size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
               <Activity size={16} color={color} />
             </div>
-            <p className="text-[14px] font-semibold" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#94a3b8" }}>{device}</p>
+            <p className="text-[14px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)" }}>{device}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="size-2 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
-            <p style={{ fontFamily: "'Instrument Sans', sans-serif", color, fontSize: 22, fontWeight: 700 }}>
+            <p style={{ fontFamily: "var(--tactus-font-sans)", color, fontSize: 22, fontWeight: 700 }}>
               {data.motionDetected ? "Motion" : "Clear"}
             </p>
           </div>
-          <p className="mt-2 text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>Last seen {data.lastSeen}</p>
+          <p className="mt-2 text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Last seen {data.lastSeen}</p>
         </>
       );
     }
@@ -390,26 +390,26 @@ function SensorCard({ state }: { state: SensorState }) {
         <>
           <div className="flex items-center justify-between w-full mb-4">
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center rounded-[10px] size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
+              <div className="flex items-center justify-center rounded-tactus-sm size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
                 <Wind size={16} color={color} />
               </div>
-              <p className="text-[14px] font-semibold" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#94a3b8" }}>{device}</p>
+              <p className="text-[14px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)" }}>{device}</p>
             </div>
             <div className="px-2.5 py-1 rounded-full" style={{ background: withAlpha(color, 0.1), border: `1px solid ${withAlpha(color, 0.25)}` }}>
-              <p className="text-[10px] font-bold uppercase" style={{ fontFamily: "'Instrument Sans', sans-serif", color }}>{label}</p>
+              <p className="text-[10px] font-bold uppercase" style={{ fontFamily: "var(--tactus-font-sans)", color }}>{label}</p>
             </div>
           </div>
-          <p style={{ fontFamily: "'Geist Mono', monospace", color, fontSize: 40, fontWeight: 600, lineHeight: 1 }}>
-            {data.aqi}<span style={{ fontSize: 14, color: "#475569" }}> AQI</span>
+          <p style={{ fontFamily: "var(--tactus-font-mono)", color, fontSize: 40, fontWeight: 600, lineHeight: 1 }}>
+            {data.aqi}<span style={{ fontSize: 14, color: "var(--tactus-text-muted)" }}> AQI</span>
           </p>
           <div className="mt-3 flex gap-4">
             <div>
-              <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>CO₂</p>
-              <p className="text-[13px] font-semibold" style={{ fontFamily: "'Geist Mono', monospace", color: "#94a3b8" }}>{data.co2} <span style={{ color: "#475569", fontSize: 11 }}>ppm</span></p>
+              <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>CO₂</p>
+              <p className="text-[13px] font-semibold" style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-secondary)" }}>{data.co2} <span style={{ color: "var(--tactus-text-muted)", fontSize: 11 }}>ppm</span></p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>PM2.5</p>
-              <p className="text-[13px] font-semibold" style={{ fontFamily: "'Geist Mono', monospace", color: "#94a3b8" }}>{data.pm25} <span style={{ color: "#475569", fontSize: 11 }}>µg/m³</span></p>
+              <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>PM2.5</p>
+              <p className="text-[13px] font-semibold" style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-secondary)" }}>{data.pm25} <span style={{ color: "var(--tactus-text-muted)", fontSize: 11 }}>µg/m³</span></p>
             </div>
           </div>
         </>
@@ -419,7 +419,7 @@ function SensorCard({ state }: { state: SensorState }) {
   };
 
   return (
-    <div className="relative flex flex-col p-5 rounded-[24px] w-full" style={{ background: "#0f1117", border: "1px solid #1e2530", minHeight: 180 }}>
+    <div className="relative flex flex-col p-5 rounded-tactus-xl w-full" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)", minHeight: 180 }}>
       {cardInner()}
     </div>
   );
@@ -434,30 +434,30 @@ function SolarCard({ solar }: { solar: SolarState }) {
   const currentHour = 10; // mock current hour
 
   return (
-    <div className="relative flex flex-col p-6 rounded-[28px]" style={{ background: "#161922", border: "1px solid #242936", boxShadow: solar.status === "generating" ? `0 20px 40px 0 ${withAlpha(SOLAR_COLOR, 0.06)}` : "none" }}>
+    <div className="relative flex flex-col p-6 rounded-tactus-2xl" style={{ background: "var(--tactus-bg-raised)", border: "1px solid var(--tactus-border-default)", boxShadow: solar.status === "generating" ? `0 20px 40px 0 ${withAlpha(SOLAR_COLOR, 0.06)}` : "none" }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center rounded-[12px] size-[40px]" style={{ background: withAlpha(SOLAR_COLOR, 0.12) }}>
+          <div className="flex items-center justify-center rounded-tactus-md size-[40px]" style={{ background: withAlpha(SOLAR_COLOR, 0.12) }}>
             <div className="size-[20px]"><SunIcon stroke={SOLAR_COLOR} size={24} /></div>
           </div>
           <div>
-            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>Solar</p>
-            <p className="text-[12px] mt-1" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>Rooftop Array · 10 kW</p>
+            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>Solar</p>
+            <p className="text-[12px] mt-1" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Rooftop Array · 10 kW</p>
           </div>
         </div>
         <div className="px-3 py-1 rounded-full" style={{ background: withAlpha(SOLAR_COLOR, 0.1), border: `1px solid ${withAlpha(SOLAR_COLOR, 0.25)}` }}>
-          <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "'Instrument Sans', sans-serif", color: SOLAR_COLOR }}>{solar.status === "generating" ? "Generating" : "Standby"}</p>
+          <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "var(--tactus-font-sans)", color: SOLAR_COLOR }}>{solar.status === "generating" ? "Generating" : "Standby"}</p>
         </div>
       </div>
 
       {/* Big number */}
       <div className="mb-1">
-        <p style={{ fontFamily: "'Geist Mono', monospace", color: SOLAR_COLOR, fontSize: 52, fontWeight: 600, lineHeight: 1 }}>
-          {solar.generatingKw.toFixed(1)}<span style={{ fontSize: 20, color: "#64748b" }}> kW</span>
+        <p style={{ fontFamily: "var(--tactus-font-mono)", color: SOLAR_COLOR, fontSize: 52, fontWeight: 600, lineHeight: 1 }}>
+          {solar.generatingKw.toFixed(1)}<span style={{ fontSize: 20, color: "var(--tactus-text-dim)" }}> kW</span>
         </p>
       </div>
-      <p className="mb-6 text-[13px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>Today's total: <span style={{ color: "#94a3b8" }}>{solar.todayKwh.toFixed(1)} kWh</span></p>
+      <p className="mb-6 text-[13px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Today's total: <span style={{ color: "var(--tactus-text-secondary)" }}>{solar.todayKwh.toFixed(1)} kWh</span></p>
 
       {/* Generation chart */}
       <div className="flex items-end gap-[3px] w-full" style={{ height: 48 }}>
@@ -467,9 +467,9 @@ function SolarCard({ solar }: { solar: SolarState }) {
         ))}
       </div>
       <div className="flex justify-between mt-2">
-        <p className="text-[10px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>12am</p>
-        <p className="text-[10px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>12pm</p>
-        <p className="text-[10px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>11pm</p>
+        <p className="text-[10px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>12am</p>
+        <p className="text-[10px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>12pm</p>
+        <p className="text-[10px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>11pm</p>
       </div>
     </div>
   );
@@ -488,19 +488,19 @@ function PowerwallCard({ powerwall, grid }: { powerwall: PowerwallState; grid: G
   const gap    = circ - filled;
 
   return (
-    <div className="relative flex flex-col p-6 rounded-[28px]" style={{ background: "#161922", border: "1px solid #242936" }}>
+    <div className="relative flex flex-col p-6 rounded-tactus-2xl" style={{ background: "var(--tactus-bg-raised)", border: "1px solid var(--tactus-border-default)" }}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center rounded-[12px] size-[40px]" style={{ background: withAlpha(color, 0.12) }}>
+          <div className="flex items-center justify-center rounded-tactus-md size-[40px]" style={{ background: withAlpha(color, 0.12) }}>
             <BatteryCharging size={18} color={color} />
           </div>
           <div>
-            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>Powerwall</p>
-            <p className="text-[12px] mt-1" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>13.5 kWh capacity</p>
+            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>Powerwall</p>
+            <p className="text-[12px] mt-1" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>13.5 kWh capacity</p>
           </div>
         </div>
         <div className="px-3 py-1 rounded-full" style={{ background: withAlpha(color, 0.1), border: `1px solid ${withAlpha(color, 0.25)}` }}>
-          <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "'Instrument Sans', sans-serif", color }}>{powerwall.status}</p>
+          <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "var(--tactus-font-sans)", color }}>{powerwall.status}</p>
         </div>
       </div>
 
@@ -508,25 +508,25 @@ function PowerwallCard({ powerwall, grid }: { powerwall: PowerwallState; grid: G
       <div className="flex items-center gap-6 mb-4">
         <div className="relative shrink-0" style={{ width: 128, height: 128 }}>
           <svg viewBox="0 0 128 128" className="size-full -rotate-90">
-            <circle cx="64" cy="64" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="9" />
+            <circle cx="64" cy="64" r={r} fill="none" stroke="var(--tactus-bg-track)" strokeWidth="9" />
             <circle cx="64" cy="64" r={r} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round"
               strokeDasharray={`${filled} ${gap}`} style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <p style={{ fontFamily: "'Geist Mono', monospace", color, fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{powerwall.pct}%</p>
+            <p style={{ fontFamily: "var(--tactus-font-mono)", color, fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{powerwall.pct}%</p>
           </div>
         </div>
 
         <div className="flex flex-col gap-3 flex-1">
           <div>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Flow</p>
-            <p style={{ fontFamily: "'Geist Mono', monospace", color: "#f8fafc", fontSize: 18, fontWeight: 600 }}>
-              {isCharging ? "+" : isDischarging ? "−" : ""}{powerwall.flowKw.toFixed(1)}<span style={{ fontSize: 12, color: "#475569" }}> kW</span>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Flow</p>
+            <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)", fontSize: 18, fontWeight: 600 }}>
+              {isCharging ? "+" : isDischarging ? "−" : ""}{powerwall.flowKw.toFixed(1)}<span style={{ fontSize: 12, color: "var(--tactus-text-muted)" }}> kW</span>
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Backup reserve</p>
-            <p style={{ fontFamily: "'Geist Mono', monospace", color: "#94a3b8", fontSize: 16, fontWeight: 600 }}>{powerwall.reservePct}%</p>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Backup reserve</p>
+            <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-secondary)", fontSize: 16, fontWeight: 600 }}>{powerwall.reservePct}%</p>
           </div>
         </div>
       </div>
@@ -534,17 +534,17 @@ function PowerwallCard({ powerwall, grid }: { powerwall: PowerwallState; grid: G
       {/* Grid flow */}
       <div className="flex gap-3 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
         <div className="flex items-center gap-2 flex-1">
-          <ArrowDownLeft size={14} color="#22C55E" />
+          <ArrowDownLeft size={14} color="var(--tactus-green)" />
           <div>
-            <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Import</p>
-            <p style={{ fontFamily: "'Geist Mono', monospace", color: "#94a3b8", fontSize: 14, fontWeight: 600 }}>{grid.importKw.toFixed(1)} kW</p>
+            <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Import</p>
+            <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-secondary)", fontSize: 14, fontWeight: 600 }}>{grid.importKw.toFixed(1)} kW</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-1">
           <ArrowUpRight size={14} color={SOLAR_COLOR} />
           <div>
-            <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Export</p>
-            <p style={{ fontFamily: "'Geist Mono', monospace", color: "#94a3b8", fontSize: 14, fontWeight: 600 }}>{grid.exportKw.toFixed(1)} kW</p>
+            <p className="text-[10px] uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Export</p>
+            <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-secondary)", fontSize: 14, fontWeight: 600 }}>{grid.exportKw.toFixed(1)} kW</p>
           </div>
         </div>
       </div>
@@ -562,19 +562,19 @@ function TeslaCard({ tesla, onChange }: { tesla: TeslaState; onChange: (p: Parti
   const filled = circ * (tesla.batteryPct / 100);
 
   return (
-    <div className="relative flex flex-col p-6 rounded-[28px]" style={{ background: "#161922", border: "1px solid #242936", boxShadow: `0 20px 40px 0 ${withAlpha(TESLA_COLOR, 0.04)}` }}>
+    <div className="relative flex flex-col p-6 rounded-tactus-2xl" style={{ background: "var(--tactus-bg-raised)", border: "1px solid var(--tactus-border-default)", boxShadow: `0 20px 40px 0 ${withAlpha(TESLA_COLOR, 0.04)}` }}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center rounded-[12px] size-[40px]" style={{ background: withAlpha(TESLA_COLOR, 0.12) }}>
+          <div className="flex items-center justify-center rounded-tactus-md size-[40px]" style={{ background: withAlpha(TESLA_COLOR, 0.12) }}>
             <Car size={18} color={TESLA_COLOR} />
           </div>
           <div>
-            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>{tesla.model}</p>
-            <p className="text-[12px] mt-1" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{tesla.location}</p>
+            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{tesla.model}</p>
+            <p className="text-[12px] mt-1" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{tesla.location}</p>
           </div>
         </div>
         <div className="px-3 py-1 rounded-full" style={{ background: withAlpha(TESLA_COLOR, 0.1), border: `1px solid ${withAlpha(TESLA_COLOR, 0.25)}` }}>
-          <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "'Instrument Sans', sans-serif", color: TESLA_COLOR }}>{tesla.status}</p>
+          <p className="text-[11px] font-bold uppercase" style={{ fontFamily: "var(--tactus-font-sans)", color: TESLA_COLOR }}>{tesla.status}</p>
         </div>
       </div>
 
@@ -582,26 +582,26 @@ function TeslaCard({ tesla, onChange }: { tesla: TeslaState; onChange: (p: Parti
       <div className="flex items-center gap-6 mb-5">
         <div className="relative shrink-0" style={{ width: 128, height: 128 }}>
           <svg viewBox="0 0 128 128" className="size-full -rotate-90">
-            <circle cx="64" cy="64" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="9" />
-            <circle cx="64" cy="64" r={r} fill="none" stroke={isCharging ? "#22C55E" : TESLA_COLOR} strokeWidth="9" strokeLinecap="round"
-              strokeDasharray={`${filled} ${circ - filled}`} style={{ filter: `drop-shadow(0 0 6px ${isCharging ? "#22C55E" : TESLA_COLOR})` }} />
+            <circle cx="64" cy="64" r={r} fill="none" stroke="var(--tactus-bg-track)" strokeWidth="9" />
+            <circle cx="64" cy="64" r={r} fill="none" stroke={isCharging ? "var(--tactus-green)" : TESLA_COLOR} strokeWidth="9" strokeLinecap="round"
+              strokeDasharray={`${filled} ${circ - filled}`} style={{ filter: `drop-shadow(0 0 6px ${isCharging ? "var(--tactus-green)" : TESLA_COLOR})` }} />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-            <p style={{ fontFamily: "'Geist Mono', monospace", color: isCharging ? "#22C55E" : TESLA_COLOR, fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{tesla.batteryPct}%</p>
-            <p style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569", fontSize: 11 }}>{tesla.rangeKm} km</p>
+            <p style={{ fontFamily: "var(--tactus-font-mono)", color: isCharging ? "var(--tactus-green)" : TESLA_COLOR, fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{tesla.batteryPct}%</p>
+            <p style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)", fontSize: 11 }}>{tesla.rangeKm} km</p>
           </div>
         </div>
 
         <div className="flex flex-col gap-3 flex-1">
           {isCharging && (
             <div>
-              <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Charging</p>
-              <p style={{ fontFamily: "'Geist Mono', monospace", color: "#22C55E", fontSize: 18, fontWeight: 600 }}>{tesla.chargingKw?.toFixed(1)}<span style={{ fontSize: 12, color: "#475569" }}> kW</span></p>
+              <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Charging</p>
+              <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-green)", fontSize: 18, fontWeight: 600 }}>{tesla.chargingKw?.toFixed(1)}<span style={{ fontSize: 12, color: "var(--tactus-text-muted)" }}> kW</span></p>
             </div>
           )}
           <div>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Interior</p>
-            <p style={{ fontFamily: "'Geist Mono', monospace", color: "#94a3b8", fontSize: 16, fontWeight: 600 }}>{tesla.tempC}°C</p>
+            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Interior</p>
+            <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-secondary)", fontSize: 16, fontWeight: 600 }}>{tesla.tempC}°C</p>
           </div>
         </div>
       </div>
@@ -610,23 +610,23 @@ function TeslaCard({ tesla, onChange }: { tesla: TeslaState; onChange: (p: Parti
       <div className="flex gap-3 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
         {/* Climate */}
         <button onClick={() => onChange({ climateOn: !tesla.climateOn })}
-          className="flex items-center gap-2 flex-1 px-3 py-2.5 rounded-[12px] cursor-pointer transition-opacity hover:opacity-80"
-          style={{ background: tesla.climateOn ? withAlpha("#3B82F6", 0.12) : "rgba(255,255,255,0.04)", border: `1px solid ${tesla.climateOn ? withAlpha("#3B82F6", 0.25) : "rgba(255,255,255,0.08)"}` }}>
+          className="flex items-center gap-2 flex-1 px-3 py-2.5 rounded-tactus-md cursor-pointer transition-opacity hover:opacity-80"
+          style={{ background: tesla.climateOn ? withAlpha("#3B82F6", 0.12) : "var(--tactus-bg-overlay)", border: `1px solid ${tesla.climateOn ? withAlpha("#3B82F6", 0.25) : "var(--tactus-border-overlay)"}` }}>
           <svg viewBox="0 0 24 24" fill="none" className="size-4 shrink-0">
-            <path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07l14.14-14.14" stroke={tesla.climateOn ? "#3B82F6" : "#475569"} strokeLinecap="round" strokeWidth="1.5" />
+            <path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07l14.14-14.14" stroke={tesla.climateOn ? "var(--tactus-blue)" : "var(--tactus-text-muted)"} strokeLinecap="round" strokeWidth="1.5" />
           </svg>
-          <p className="text-[12px] font-semibold" style={{ fontFamily: "'Instrument Sans', sans-serif", color: tesla.climateOn ? "#3B82F6" : "#475569" }}>Climate</p>
+          <p className="text-[12px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: tesla.climateOn ? "var(--tactus-blue)" : "var(--tactus-text-muted)" }}>Climate</p>
         </button>
         {/* Lock */}
         <button onClick={() => onChange({ locked: !tesla.locked })}
-          className="flex items-center gap-2 flex-1 px-3 py-2.5 rounded-[12px] cursor-pointer transition-opacity hover:opacity-80"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          className="flex items-center gap-2 flex-1 px-3 py-2.5 rounded-tactus-md cursor-pointer transition-opacity hover:opacity-80"
+          style={{ background: "var(--tactus-bg-overlay)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <svg viewBox="0 0 24 24" fill="none" className="size-4 shrink-0">
             {tesla.locked
-              ? <><rect x="3" y="11" width="18" height="11" rx="2" stroke="#22C55E" strokeWidth="1.5" /><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#22C55E" strokeLinecap="round" strokeWidth="1.5" /></>
-              : <><rect x="3" y="11" width="18" height="11" rx="2" stroke="#475569" strokeWidth="1.5" /><path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="#475569" strokeLinecap="round" strokeWidth="1.5" /></>}
+              ? <><rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--tactus-green)" strokeWidth="1.5" /><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="var(--tactus-green)" strokeLinecap="round" strokeWidth="1.5" /></>
+              : <><rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--tactus-text-muted)" strokeWidth="1.5" /><path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="var(--tactus-text-muted)" strokeLinecap="round" strokeWidth="1.5" /></>}
           </svg>
-          <p className="text-[12px] font-semibold" style={{ fontFamily: "'Instrument Sans', sans-serif", color: tesla.locked ? "#22C55E" : "#475569" }}>{tesla.locked ? "Locked" : "Unlocked"}</p>
+          <p className="text-[12px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: tesla.locked ? "var(--tactus-green)" : "var(--tactus-text-muted)" }}>{tesla.locked ? "Locked" : "Unlocked"}</p>
         </button>
       </div>
     </div>
@@ -641,12 +641,12 @@ function EnvMetric({ icon, value, unit, label, color }: { icon: React.ReactNode;
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-1">
-        <span style={{ color, fontSize: 22, fontFamily: "'Geist Mono', monospace", fontWeight: 700, lineHeight: 1 }}>{value}</span>
-        <span style={{ color: "#475569", fontSize: 12, fontFamily: "'Geist Mono', monospace", fontWeight: 600 }}>{unit}</span>
+        <span style={{ color, fontSize: 22, fontFamily: "var(--tactus-font-mono)", fontWeight: 700, lineHeight: 1 }}>{value}</span>
+        <span style={{ color: "var(--tactus-text-muted)", fontSize: 12, fontFamily: "var(--tactus-font-mono)", fontWeight: 600 }}>{unit}</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span style={{ color: "#334155" }}>{icon}</span>
-        <span style={{ color: "#334155", fontSize: 11, fontFamily: "'Instrument Sans', sans-serif", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+        <span style={{ color: "var(--tactus-text-faint)" }}>{icon}</span>
+        <span style={{ color: "var(--tactus-text-faint)", fontSize: 11, fontFamily: "var(--tactus-font-sans)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
       </div>
     </div>
   );
@@ -665,18 +665,18 @@ function EnvironmentBar({ rooms, outdoor }: { rooms: Room[]; outdoor: OutdoorSta
   const indoorAqi   = avg(aqis);
   const indoorCo2   = avg(co2s);
 
-  const tempColor  = (t: number) => t < 18 ? "#93C5FD" : t > 26 ? "#FB7185" : "#22C55E";
-  const humidColor = (h: number) => h < 30 ? "#F59E0B" : h > 65 ? "#3B82F6" : "#22C55E";
-  const aqiColor   = (a: number) => a <= 50 ? "#22C55E" : a <= 100 ? "#F59E0B" : "#FB7185";
-  const co2Color   = (c: number) => c < 800 ? "#22C55E" : c < 1200 ? "#F59E0B" : "#FB7185";
+  const tempColor  = (t: number) => t < 18 ? "var(--tactus-blue-light)" : t > 26 ? "var(--tactus-pink)" : "var(--tactus-green)";
+  const humidColor = (h: number) => h < 30 ? "var(--tactus-amber)" : h > 65 ? "var(--tactus-blue)" : "var(--tactus-green)";
+  const aqiColor   = (a: number) => a <= 50 ? "var(--tactus-green)" : a <= 100 ? "var(--tactus-amber)" : "var(--tactus-pink)";
+  const co2Color   = (c: number) => c < 800 ? "var(--tactus-green)" : c < 1200 ? "var(--tactus-amber)" : "var(--tactus-pink)";
 
   return (
-    <div className="rounded-[24px] overflow-hidden" style={{ background: "#0f1117", border: "1px solid #1e2530" }}>
-      <div className="flex divide-x" style={{ divideColor: "#1e2530" }}>
+    <div className="rounded-tactus-xl overflow-hidden" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
+      <div className="flex divide-x" style={{ divideColor: "var(--tactus-border-subtle)" }}>
 
         {/* Indoor */}
         <div className="flex-1 p-5 flex flex-col gap-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#1e2530" }}>Indoor</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-border-subtle)" }}>Indoor</p>
           <div className="flex flex-wrap gap-x-8 gap-y-4">
             {indoorTemp  !== null && <EnvMetric icon={<Thermometer size={12} />} value={indoorTemp.toFixed(1)}   unit="°C"  label="Temp"     color={tempColor(indoorTemp)} />}
             {indoorHumid !== null && <EnvMetric icon={<Droplets    size={12} />} value={indoorHumid.toFixed(0)}  unit="%"   label="Humidity" color={humidColor(indoorHumid)} />}
@@ -686,13 +686,13 @@ function EnvironmentBar({ rooms, outdoor }: { rooms: Room[]; outdoor: OutdoorSta
         </div>
 
         {/* Divider */}
-        <div style={{ width: 1, background: "#1e2530", flexShrink: 0 }} />
+        <div style={{ width: 1, background: "var(--tactus-border-subtle)", flexShrink: 0 }} />
 
         {/* Outdoor */}
         <div className="flex-1 p-5 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#1e2530" }}>Outdoor</p>
-            <p className="text-[11px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>{outdoor.condition}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-border-subtle)" }}>Outdoor</p>
+            <p className="text-[11px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>{outdoor.condition}</p>
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-4">
             <EnvMetric icon={<Thermometer size={12} />} value={outdoor.tempC.toFixed(1)}  unit="°C"   label="Temp"     color={tempColor(outdoor.tempC)} />
@@ -712,9 +712,9 @@ function EnvironmentBar({ rooms, outdoor }: { rooms: Room[]; outdoor: OutdoorSta
 function SectionHeading({ label, count }: { label: string; count?: number }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <p className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>{label}</p>
-      {count !== undefined && <div className="flex items-center justify-center px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}><p className="text-[10px] font-semibold" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{count}</p></div>}
-      <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.04)" }} />
+      <p className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>{label}</p>
+      {count !== undefined && <div className="flex items-center justify-center px-2 py-0.5 rounded-full" style={{ background: "var(--tactus-bg-overlay)" }}><p className="text-[10px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{count}</p></div>}
+      <div className="flex-1 h-px" style={{ background: "var(--tactus-bg-overlay)" }} />
     </div>
   );
 }
@@ -728,12 +728,12 @@ function RoomControls({ roomBrightness, roomColor, onBrightnessChange, onColorCh
 }) {
   return (
     <div className="px-8 py-5 flex flex-col gap-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-      <p className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>{label}</p>
+      <p className="text-[11px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>{label}</p>
       <div className="flex items-center gap-4">
-        <div className="size-[16px] shrink-0"><SunIcon stroke="#475569" size={16} /></div>
+        <div className="size-[16px] shrink-0"><SunIcon stroke="var(--tactus-text-muted)" size={16} /></div>
         <div className="flex-1"><BrightnessSlider value={roomBrightness} onChange={onBrightnessChange} accent={roomColor.hex} /></div>
         <div className="size-[20px] shrink-0"><SunIcon stroke={roomColor.hex} size={24} /></div>
-        <p className="w-[42px] text-right text-[13px] shrink-0" style={{ fontFamily: "'Geist Mono', monospace", color: "#f8fafc", fontWeight: 600 }}>{roomBrightness}%</p>
+        <p className="w-[42px] text-right text-[13px] shrink-0" style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)", fontWeight: 600 }}>{roomBrightness}%</p>
       </div>
       <div className="flex items-center gap-4">
         <div className="w-[16px] h-[16px] shrink-0 rounded-full" style={{ background: roomColor.hex }} />
@@ -750,7 +750,7 @@ function RoomControls({ roomBrightness, roomColor, onBrightnessChange, onColorCh
             );
           })}
         </div>
-        <p className="text-[13px] font-normal shrink-0 w-[80px] text-right" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#94a3b8" }}>{roomColor.label}</p>
+        <p className="text-[13px] font-normal shrink-0 w-[80px] text-right" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)" }}>{roomColor.label}</p>
       </div>
     </div>
   );
@@ -773,26 +773,26 @@ function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorCh
   const motionSensor   = sensors.find((s) => s.data.kind === "motion");
 
   return (
-    <div className="relative flex flex-col p-6 rounded-[28px] w-full" style={{ background: allOff ? "#0b0c10" : "#161922", border: hasError ? "1px solid rgba(239,68,68,0.4)" : "1px solid #242936", boxShadow: isAnyOn ? `0 16px 40px 0 ${withAlpha(dominant, 0.07)}` : "none" }}>
+    <div className="relative flex flex-col p-6 rounded-tactus-2xl w-full" style={{ background: allOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)", border: hasError ? `1px solid ${withAlpha("#EF4444", 0.4)}` : "1px solid var(--tactus-border-default)", boxShadow: isAnyOn ? `0 16px 40px 0 ${withAlpha(dominant, 0.07)}` : "none" }}>
       {/* Top row */}
       <button className="flex items-start justify-between w-full mb-5 text-left cursor-pointer hover:opacity-90 transition-opacity" onClick={onNavigate}>
         <div className="flex flex-col gap-1.5">
-          <h2 className="text-[22px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: allOff ? "#64748b" : "#f8fafc" }}>{name}</h2>
+          <h2 className="text-[22px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: allOff ? "var(--tactus-text-dim)" : "var(--tactus-text-primary)" }}>{name}</h2>
           <div className="flex items-center gap-3">
-            {activeLights > 0 && <p className="text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{activeLights} light{activeLights > 1 ? "s" : ""}</p>}
-            {activeSwitches > 0 && <p className="text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{activeSwitches} plug{activeSwitches > 1 ? "s" : ""}</p>}
-            {allOff && <p className="text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>All off</p>}
-            {tempSensor && tempSensor.data.kind === "temp" && <p className="text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{tempSensor.data.tempC.toFixed(1)}°C</p>}
+            {activeLights > 0 && <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{activeLights} light{activeLights > 1 ? "s" : ""}</p>}
+            {activeSwitches > 0 && <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{activeSwitches} plug{activeSwitches > 1 ? "s" : ""}</p>}
+            {allOff && <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>All off</p>}
+            {tempSensor && tempSensor.data.kind === "temp" && <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{tempSensor.data.tempC.toFixed(1)}°C</p>}
             {motionSensor && motionSensor.data.kind === "motion" && motionSensor.data.motionDetected && (
-              <div className="flex items-center gap-1"><div className="size-1.5 rounded-full" style={{ background: "#F59E0B" }} /><p className="text-[12px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#F59E0B" }}>Motion</p></div>
+              <div className="flex items-center gap-1"><div className="size-1.5 rounded-full" style={{ background: "var(--tactus-amber)" }} /><p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-amber)" }}>Motion</p></div>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {hasError && <div className="flex items-center px-2.5 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}><p className="text-[10px] font-bold uppercase" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#EF4444" }}>Error</p></div>}
+          {hasError && <div className="flex items-center px-2.5 py-1 rounded-full" style={{ background: withAlpha("#EF4444", 0.08), border: `1px solid ${withAlpha("#EF4444", 0.2)}` }}><p className="text-[10px] font-bold uppercase" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-red)" }}>Error</p></div>}
           <div role="button" onClick={(e) => { e.stopPropagation(); onToggleAll(allOff); }} className="flex items-center justify-center size-[36px] rounded-full transition-opacity hover:opacity-80 cursor-pointer"
-            style={{ background: isAnyOn ? withAlpha(dominant, 0.15) : "rgba(255,255,255,0.04)", border: isAnyOn ? `1px solid ${withAlpha(dominant, 0.3)}` : "1px solid rgba(255,255,255,0.08)" }}>
-            <svg viewBox="0 0 24 24" fill="none" className="size-[16px]"><path d="M12 3v6M6.3 6.3a8 8 0 1 0 11.4 0" stroke={isAnyOn ? dominant : "#475569"} strokeLinecap="round" strokeWidth="2" /></svg>
+            style={{ background: isAnyOn ? withAlpha(dominant, 0.15) : "var(--tactus-bg-overlay)", border: isAnyOn ? `1px solid ${withAlpha(dominant, 0.3)}` : "1px solid rgba(255,255,255,0.08)" }}>
+            <svg viewBox="0 0 24 24" fill="none" className="size-[16px]"><path d="M12 3v6M6.3 6.3a8 8 0 1 0 11.4 0" stroke={isAnyOn ? dominant : "var(--tactus-text-muted)"} strokeLinecap="round" strokeWidth="2" /></svg>
           </div>
         </div>
       </button>
@@ -801,17 +801,17 @@ function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorCh
       <div className="flex items-center gap-2 flex-wrap mb-4">
         {lights.map((l) => {
           const on = l.cardState === "on", err = l.cardState === "error";
-          const dc = err ? "#EF4444" : on ? l.selectedColor.hex : "#1e2530";
+          const dc = err ? "var(--tactus-red)" : on ? l.selectedColor.hex : "var(--tactus-border-subtle)";
           return <div key={l.id} className="rounded-full shrink-0" title={`${l.device}`} style={{ width: 10, height: 10, background: dc, boxShadow: on ? `0 0 8px 0 ${withAlpha(l.selectedColor.hex, 0.5)}` : "none" }} />;
         })}
         {switches.map((s) => (
-          <div key={s.id} className="rounded-sm shrink-0" title={`${s.device}`} style={{ width: 10, height: 10, background: s.isOn ? "#22C55E" : "#1e2530", boxShadow: s.isOn ? `0 0 8px 0 ${withAlpha("#22C55E", 0.5)}` : "none" }} />
+          <div key={s.id} className="rounded-sm shrink-0" title={`${s.device}`} style={{ width: 10, height: 10, background: s.isOn ? "var(--tactus-green)" : "var(--tactus-border-subtle)", boxShadow: s.isOn ? `0 0 8px 0 ${withAlpha("#22C55E", 0.5)}` : "none" }} />
         ))}
       </div>
 
       {/* Brightness */}
       <div className="w-full mb-4">
-        <BrightnessSlider value={isAnyOn ? roomBrightness : 0} onChange={(v) => { if (isAnyOn) onBrightnessChange(v); }} accent={isAnyOn ? dominant : "#242936"} />
+        <BrightnessSlider value={isAnyOn ? roomBrightness : 0} onChange={(v) => { if (isAnyOn) onBrightnessChange(v); }} accent={isAnyOn ? dominant : "var(--tactus-border-default)"} />
       </div>
 
       {/* Color swatches + manage */}
@@ -828,8 +828,8 @@ function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorCh
           );
         })}
         <button onClick={onNavigate} className="ml-auto flex items-center gap-1 cursor-pointer hover:opacity-70 transition-opacity">
-          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#334155" }}>Manage</p>
-          <svg viewBox="0 0 24 24" fill="none" className="size-[12px]"><path d="M9 18L15 12L9 6" stroke="#334155" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Manage</p>
+          <svg viewBox="0 0 24 24" fill="none" className="size-[12px]"><path d="M9 18L15 12L9 6" stroke="var(--tactus-text-faint)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
         </button>
       </div>
     </div>
@@ -871,16 +871,16 @@ function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, 
   const handleRoomColor = (room: Room, c: Color) => onUpdateRoom(room.id, { roomColor: c, lights: room.lights.map((l) => l.cardState !== "on" ? l : { ...l, selectedColor: c }) });
 
   return (
-    <div className="min-h-screen" style={{ background: "#0b0c10" }}>
-      <div className="sticky top-0 z-10" style={{ background: "rgba(11,12,16,0.9)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+    <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
+      <div className="sticky top-0 z-10" style={{ background: "var(--tactus-bg-blur)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
         <div className="px-8 py-6 flex items-center justify-between">
           <div className="flex flex-col gap-1">
-            <h1 className="text-[28px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>My Home</h1>
-            <p className="text-[13px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{totalActive} of {totalDevices} devices active</p>
+            <h1 className="text-[28px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>My Home</h1>
+            <p className="text-[13px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{totalActive} of {totalDevices} devices active</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setAllLights(false)} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "'Instrument Sans', sans-serif", color: "#94a3b8", fontSize: 13, fontWeight: 600 }}>All Off</button>
-            <button onClick={() => setAllLights(true)} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "rgba(255,249,229,0.1)", border: "1px solid rgba(255,249,229,0.2)", fontFamily: "'Instrument Sans', sans-serif", color: "#FFF9E5", fontSize: 13, fontWeight: 600 }}>All On</button>
+            <button onClick={() => setAllLights(false)} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "var(--tactus-bg-overlay)", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)", fontSize: 13, fontWeight: 600 }}>All Off</button>
+            <button onClick={() => setAllLights(true)} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: withAlpha("#FFF9E5", 0.1), border: `1px solid ${withAlpha("#FFF9E5", 0.2)}`, fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-warm-white)", fontSize: 13, fontWeight: 600 }}>All On</button>
           </div>
         </div>
         <RoomControls roomBrightness={houseBrightness} roomColor={houseColor} onBrightnessChange={handleHouseBrightness} onColorChange={handleHouseColor} label="All Lights" />
@@ -936,25 +936,25 @@ function RoomView({ room, onBack, onUpdateRoom }: { room: Room; onBack: () => vo
   const handleRoomColor = (c: Color) => onUpdateRoom({ roomColor: c, lights: lights.map((l) => l.cardState !== "on" ? l : { ...l, selectedColor: c }) });
 
   return (
-    <div className="min-h-screen" style={{ background: "#0b0c10" }}>
-      <div className="sticky top-0 z-10" style={{ background: "rgba(11,12,16,0.9)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+    <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
+      <div className="sticky top-0 z-10" style={{ background: "var(--tactus-bg-blur)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
         <div className="px-8 py-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={onBack} className="flex items-center justify-center size-[36px] rounded-full cursor-pointer hover:opacity-80 transition-opacity shrink-0" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <button onClick={onBack} className="flex items-center justify-center size-[36px] rounded-full cursor-pointer hover:opacity-80 transition-opacity shrink-0" style={{ background: "var(--tactus-bg-overlay)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div className="size-[18px]"><ChevronLeft /></div>
             </button>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <span className="text-[13px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>My Home</span>
-                <span style={{ color: "#334155" }}>/</span>
-                <h1 className="text-[18px] font-semibold leading-none" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#f8fafc" }}>{name}</h1>
+                <span className="text-[13px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>My Home</span>
+                <span style={{ color: "var(--tactus-text-faint)" }}>/</span>
+                <h1 className="text-[18px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{name}</h1>
               </div>
-              <p className="text-[13px]" style={{ fontFamily: "'Instrument Sans', sans-serif", color: "#475569" }}>{activeCount} of {totalCount} devices active</p>
+              <p className="text-[13px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{activeCount} of {totalCount} devices active</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={allOff} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "'Instrument Sans', sans-serif", color: "#94a3b8", fontSize: 13, fontWeight: 600 }}>All Off</button>
-            <button onClick={allOn} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "rgba(255,249,229,0.1)", border: "1px solid rgba(255,249,229,0.2)", fontFamily: "'Instrument Sans', sans-serif", color: "#FFF9E5", fontSize: 13, fontWeight: 600 }}>All On</button>
+            <button onClick={allOff} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "var(--tactus-bg-overlay)", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)", fontSize: 13, fontWeight: 600 }}>All Off</button>
+            <button onClick={allOn} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: withAlpha("#FFF9E5", 0.1), border: `1px solid ${withAlpha("#FFF9E5", 0.2)}`, fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-warm-white)", fontSize: 13, fontWeight: 600 }}>All On</button>
           </div>
         </div>
         {lights.length > 0 && <RoomControls roomBrightness={roomBrightness} roomColor={roomColor} onBrightnessChange={handleRoomBrightness} onColorChange={handleRoomColor} />}
