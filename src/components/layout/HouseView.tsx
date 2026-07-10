@@ -10,11 +10,15 @@ import { PowerwallCard } from "@/components/cards/PowerwallCard";
 import { TeslaCard } from "@/components/cards/TeslaCard";
 import { RoomCard } from "@/components/cards/RoomCard";
 
-export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, onUpdateRoom, onUpdateTesla }: {
+type ControlStatus = "idle" | "pending" | "error";
+
+export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, onUpdateRoom, teslaControl, onToggleTeslaClimate, onToggleTeslaLock }: {
   rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState;
   onNavigate: (id: string) => void;
   onUpdateRoom: (id: string, p: Partial<Room>) => void;
-  onUpdateTesla: (p: Partial<TeslaState>) => void;
+  teslaControl: { climate: ControlStatus; lock: ControlStatus };
+  onToggleTeslaClimate: () => void;
+  onToggleTeslaLock: () => void;
 }) {
   const [houseBrightness, setHouseBrightness] = useState(75);
   const [houseColor, setHouseColor] = useState<Color>(COLORS[0]);
@@ -66,7 +70,7 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
             <SolarCard solar={solar} />
             <PowerwallCard powerwall={powerwall} grid={grid} />
-            <TeslaCard tesla={tesla} onChange={onUpdateTesla} />
+            <TeslaCard tesla={tesla} climateControl={teslaControl.climate} lockControl={teslaControl.lock} onToggleClimate={onToggleTeslaClimate} onToggleLock={onToggleTeslaLock} />
           </div>
         </div>
 

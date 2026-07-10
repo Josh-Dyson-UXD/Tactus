@@ -106,6 +106,14 @@
   --tactus-radius-base: 0.625rem; /* fallback for any remaining shadcn primitives in use */
 }
 
+/* Ambient "awaiting confirmation" breathe — pairs with --tactus-motion-pending-pulse.
+   Usage: animation: tactus-pulse var(--tactus-motion-pending-pulse);
+   Never use a spinner for this state — see CLAUDE.md "Design rules". */
+@keyframes tactus-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Tailwind v4 @theme bridge — exposes tokens as utility classes
    (e.g. bg-tactus-raised, text-tactus-primary, rounded-tactus-3xl)

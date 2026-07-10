@@ -10,7 +10,7 @@ export const COLORS = [
 ];
 
 export type Color     = typeof COLORS[number];
-export type CardState = "off" | "on" | "error";
+export type CardState = "off" | "on" | "pending" | "error";
 export type Panel     = "summary" | "brightness" | "color";
 
 // ─── Device state types ───────────────────────────────────────────────────────
