@@ -149,6 +149,10 @@ export default function App() {
     controlLight(entityId, "turn_on", { rgb_color: hexToRgb(color.hex) });
   }, [controlLight]);
 
+  const handleLightColorTemp = useCallback((entityId: string, kelvin: number) => {
+    controlLight(entityId, "turn_on", { color_temp_kelvin: kelvin });
+  }, [controlLight]);
+
   // ─── Tesla control: pending → confirmed cycle ────────────────────────────
   const controlTesla = useCallback((key: "climate" | "lock", domain: string, service: string, entityId: string) => {
     const client = clientRef.current;
@@ -199,7 +203,7 @@ export default function App() {
       {selectedRoom ? (
         <motion.div key={selectedRoom.id} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
           <RoomView room={selectedRoom} onBack={() => setRoomId(null)} onUpdateRoom={(p) => updateRoom(selectedRoom.id, p)}
-            onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} />
+            onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} onLightColorTemp={handleLightColorTemp} />
         </motion.div>
       ) : (
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>

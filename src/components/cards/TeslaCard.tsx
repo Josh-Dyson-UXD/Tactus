@@ -42,7 +42,7 @@ export function TeslaCard({ tesla, climateControl, lockControl, onToggleClimate,
       {/* Ring + range */}
       <div className="flex items-center gap-6 mb-5">
         <div className="relative shrink-0" style={{ width: 128, height: 128 }}>
-          <svg viewBox="0 0 128 128" className="size-full -rotate-90">
+          <svg viewBox="0 0 128 128" className="size-full -rotate-90 overflow-visible">
             <circle cx="64" cy="64" r={r} fill="none" stroke="var(--tactus-bg-track)" strokeWidth="9" />
             <circle cx="64" cy="64" r={r} fill="none" stroke={isCharging ? "var(--tactus-green)" : TESLA_COLOR} strokeWidth="9" strokeLinecap="round"
               strokeDasharray={`${filled} ${circ - filled}`} style={{ filter: `drop-shadow(0 0 6px ${isCharging ? "var(--tactus-green)" : TESLA_COLOR})` }} />

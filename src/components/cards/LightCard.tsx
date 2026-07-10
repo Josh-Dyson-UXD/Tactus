@@ -2,23 +2,26 @@ import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { COLORS } from "@/types";
 import type { LightState, Color } from "@/types";
-import { withAlpha } from "@/lib/helpers";
+import { withAlpha, kelvinToHex } from "@/lib/helpers";
 import { LightbulbIcon, AlertIcon, SunIcon, WifiOffIcon } from "@/components/icons";
 import { BrightnessSlider } from "@/components/controls/BrightnessSlider";
+import { ColorTempSlider } from "@/components/controls/ColorTempSlider";
 
-const BRIGHTNESS_COMMIT_DELAY = 400;
+const COMMIT_DELAY = 400;
 
-export function LightCard({ state, onChange, onToggle, onCommitBrightness, onCommitColor, onRetry }: {
+export function LightCard({ state, onChange, onToggle, onCommitBrightness, onCommitColor, onCommitColorTemp, onRetry }: {
   state: LightState;
   onChange: (p: Partial<LightState>) => void;
   onToggle: (on: boolean) => void;
   onCommitBrightness: (v: number) => void;
   onCommitColor: (c: Color) => void;
+  onCommitColorTemp: (kelvin: number) => void;
   onRetry: () => void;
 }) {
-  const { cardState, panel, brightness, selectedColor, device } = state;
+  const { cardState, panel, brightness, selectedColor, colorMode, colorTempKelvin, colorTempRange, device } = state;
   const isOn = cardState === "on", isOff = cardState === "off", isPending = cardState === "pending", isError = cardState === "error";
-  const accent = isError ? "#EF4444" : (isOn || isPending) ? selectedColor.hex : "#475569";
+  const hasColorPanel = colorMode !== "brightness";
+  const accent = isError ? "#EF4444" : (isOn || isPending) ? (colorMode === "temp" && colorTempKelvin ? kelvinToHex(colorTempKelvin) : selectedColor.hex) : "#475569";
   const accentLight = (isOn || isPending) ? withAlpha(accent, 0.13) : "var(--tactus-bg-hairline)";
   const pulse = isPending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined;
 
@@ -26,11 +29,22 @@ export function LightCard({ state, onChange, onToggle, onCommitBrightness, onCom
   // light.turn_on call only fires once the drag settles, so we're not
   // flooding HA with a service call per pixel of movement.
   const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (brightnessTimer.current) clearTimeout(brightnessTimer.current); }, []);
+  const colorTempTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
+    if (colorTempTimer.current) clearTimeout(colorTempTimer.current);
+  }, []);
+
   const handleBrightnessChange = (v: number) => {
     onChange({ brightness: v });
     if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
-    brightnessTimer.current = setTimeout(() => onCommitBrightness(v), BRIGHTNESS_COMMIT_DELAY);
+    brightnessTimer.current = setTimeout(() => onCommitBrightness(v), COMMIT_DELAY);
+  };
+
+  const handleColorTempChange = (kelvin: number) => {
+    onChange({ colorTempKelvin: kelvin });
+    if (colorTempTimer.current) clearTimeout(colorTempTimer.current);
+    colorTempTimer.current = setTimeout(() => onCommitColorTemp(kelvin), COMMIT_DELAY);
   };
 
   const handleColorPick = (c: Color) => {
@@ -110,10 +124,14 @@ export function LightCard({ state, onChange, onToggle, onCommitBrightness, onCom
                   <div className="size-[32px]"><SunIcon stroke="var(--tactus-text-secondary)" size={32} /></div>
                   <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{brightness}%</p>
                 </button>
-                <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => onChange({ panel: "color" })}>
-                  <div className="size-[32px] rounded-full" style={{ background: selectedColor.hex }} />
-                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{selectedColor.label.split(" ")[0]}</p>
-                </button>
+                {hasColorPanel && (
+                  <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => onChange({ panel: "color" })}>
+                    <div className="size-[32px] rounded-full" style={{ background: colorMode === "temp" && colorTempKelvin ? kelvinToHex(colorTempKelvin) : selectedColor.hex }} />
+                    <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>
+                      {colorMode === "temp" && colorTempKelvin ? `${Math.round(colorTempKelvin / 100) * 100}K` : selectedColor.label.split(" ")[0]}
+                    </p>
+                  </button>
+                )}
               </div>
             </motion.div>
           ) : panel === "brightness" ? (
@@ -128,7 +146,19 @@ export function LightCard({ state, onChange, onToggle, onCommitBrightness, onCom
               </button>
               <BrightnessSlider value={brightness} onChange={handleBrightnessChange} accent={accent} />
             </motion.div>
-          ) : (
+          ) : panel === "color" && hasColorPanel && colorMode === "temp" && colorTempRange ? (
+            <motion.div key="temp" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+              <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => onChange({ panel: "summary" })}>
+                <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(colorTempRange.min) }} />
+                <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
+                  <span style={{ fontSize: 24, fontWeight: 600 }}>{colorTempKelvin ?? colorTempRange.min}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}> K</span>
+                </p>
+                <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(colorTempRange.max) }} />
+              </button>
+              <ColorTempSlider value={colorTempKelvin ?? colorTempRange.min} min={colorTempRange.min} max={colorTempRange.max} onChange={handleColorTempChange} />
+            </motion.div>
+          ) : panel === "color" && hasColorPanel ? (
             <motion.div key="col" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
               <div className="flex gap-[12px] items-center w-full">
                 {COLORS.map((c) => (
@@ -142,7 +172,7 @@ export function LightCard({ state, onChange, onToggle, onCommitBrightness, onCom
               </div>
               <p className="text-[13px] font-normal leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{selectedColor.label}</p>
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
     </motion.div>

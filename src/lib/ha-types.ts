@@ -1,5 +1,5 @@
 import { COLORS } from "@/types";
-import type { Room, LightState, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState } from "@/types";
+import type { Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState } from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
 // Real entity IDs confirmed from HA Developer Tools → States, 2026-07-10 —
@@ -68,21 +68,46 @@ function nearestColor(rgb: [number, number, number]): Color {
   return best;
 }
 
+// Real device capability from attributes.supported_color_modes — confirmed
+// against the actual 15 DIRIGERA light.* entities in HA (2026-07-10). HA
+// reports "hs"/"xy"/"rgb"/"rgbw"/"rgbww" for full-colour lights (never a mode
+// literally named "rgb" on our devices — they report "hs" — but any of these
+// implies a full colour picker makes sense), "color_temp" alone for tunable-
+// white-only lights, and just "brightness" for dimmer-only lights.
+function colorModeFromSupported(modes: string[]): LightColorMode {
+  if (modes.some((m) => m === "hs" || m === "xy" || m === "rgb" || m === "rgbw" || m === "rgbww")) return "rgb";
+  if (modes.includes("color_temp")) return "temp";
+  return "brightness";
+}
+
 export function mapLightEntity(entity: HAEntity): LightState {
   const isUnavailable = entity.state === "unavailable" || entity.state === "unknown";
   const isOn = entity.state === "on";
-  const brightness255 = entity.attributes.brightness as number | undefined;
-  const brightness = brightness255 !== undefined ? Math.round((brightness255 / 255) * 100) : 0;
-  const rgb = entity.attributes.rgb_color as [number, number, number] | undefined;
+  const brightness255 = entity.attributes.brightness as number | null | undefined;
+  const brightness = brightness255 != null ? Math.round((brightness255 / 255) * 100) : 0;
+  const rgb = entity.attributes.rgb_color as [number, number, number] | null | undefined;
+
+  const supportedModes = (entity.attributes.supported_color_modes as string[] | undefined) ?? [];
+  const colorMode = colorModeFromSupported(supportedModes);
+
+  const minK = entity.attributes.min_color_temp_kelvin as number | undefined;
+  const maxK = entity.attributes.max_color_temp_kelvin as number | undefined;
+  const currentK = entity.attributes.color_temp_kelvin as number | null | undefined;
+  const colorTempRange = (minK !== undefined && maxK !== undefined) ? { min: minK, max: maxK } : undefined;
+  const colorTempKelvin = currentK ?? (colorTempRange ? Math.round((colorTempRange.min + colorTempRange.max) / 2) : undefined);
 
   return {
     id: entity.entity_id,
-    device: (entity.attributes.friendly_name as string) ?? entity.entity_id,
+    // Some DIRIGERA friendly_names carry a trailing space (e.g. "Pendants ") — trim it.
+    device: ((entity.attributes.friendly_name as string) ?? entity.entity_id).trim(),
     type: "light",
     cardState: isUnavailable ? "error" : isOn ? "on" : "off",
     panel: "summary",
     brightness,
+    colorMode,
     selectedColor: rgb ? nearestColor(rgb) : COLORS[0],
+    colorTempRange,
+    colorTempKelvin,
   };
 }
 

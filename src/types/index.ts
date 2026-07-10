@@ -13,12 +13,19 @@ export type Color     = typeof COLORS[number];
 export type CardState = "off" | "on" | "pending" | "error";
 export type Panel     = "summary" | "brightness" | "color";
 
+// A light's actual DIRIGERA/HA colour capability (attributes.supported_color_modes),
+// not assumed — "rgb" (hs/xy/rgb*), "temp" (color_temp only), or "brightness" (no colour at all).
+export type LightColorMode = "rgb" | "temp" | "brightness";
+
 // ─── Device state types ───────────────────────────────────────────────────────
 
 export type LightState = {
   id: string; device: string; type: "light";
   cardState: CardState; panel: Panel;
   brightness: number; selectedColor: Color;
+  colorMode: LightColorMode;
+  colorTempKelvin?: number;                        // current value, only meaningful when colorMode === "temp"
+  colorTempRange?: { min: number; max: number };    // device's real min/max_color_temp_kelvin
 };
 
 export type SwitchState = {

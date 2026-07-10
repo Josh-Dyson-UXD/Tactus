@@ -33,7 +33,7 @@ export function PowerwallCard({ powerwall, grid }: { powerwall: PowerwallState; 
       {/* Ring + percentage */}
       <div className="flex items-center gap-6 mb-4">
         <div className="relative shrink-0" style={{ width: 128, height: 128 }}>
-          <svg viewBox="0 0 128 128" className="size-full -rotate-90">
+          <svg viewBox="0 0 128 128" className="size-full -rotate-90 overflow-visible">
             <circle cx="64" cy="64" r={r} fill="none" stroke="var(--tactus-bg-track)" strokeWidth="9" />
             <circle cx="64" cy="64" r={r} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round"
               strokeDasharray={`${filled} ${gap}`} style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
