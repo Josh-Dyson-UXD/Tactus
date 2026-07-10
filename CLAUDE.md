@@ -117,16 +117,42 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
   value — not just whatever the user requested. If a command times out or
   the device doesn't update, show the existing error/unreachable state on
   the card, not a silent failure.
-- **Entity mapping (provisional — confirm exact entity IDs from your HA
-  Developer Tools → States before building):**
-  - `sensor.powerwall_*` → `PowerwallState`
-  - `sensor.solar_*` / Tesla solar entities → `SolarState`
-  - `sensor.grid_*` → `GridState`
-  - Tesla integration entities (`device_tracker`, `sensor.*_battery`,
-    `lock.*`, `climate.*`) → `TeslaState`
-  - DIRIGERA light/group entities → `LightState`
-  - Plug/switch entities → `SwitchState`
-  - Motion/temp/humidity/AQI sensor entities → `SensorState` payloads
+- **Entity mapping (confirmed from HA Developer Tools → States, 2026-07-10):**
+  - `sensor.home_solar_power` (instantaneous kW) + `sensor.home_solar_generated`
+    (today's kWh) → `SolarState`. Status: "generating" if `generatingKw > 0`,
+    else "idle".
+  - `sensor.home_percentage_charged` → `PowerwallState.pct`.
+    `sensor.home_battery_power` → `flowKw` (confirm sign convention when
+    wiring up — TBD whether positive means charging or discharging).
+    `number.home_backup_reserve` → `reservePct`. Status derived from sign of
+    battery power plus `binary_sensor.home_grid_status` /
+    `sensor.home_island_status` for backup/island detection.
+  - `sensor.home_grid_power` (instantaneous, signed) → split by sign into
+    `GridState.importKw` / `exportKw`. (`sensor.home_grid_imported` /
+    `home_grid_exported` are cumulative today-kWh totals — a different
+    metric, not live flow.)
+  - Tesla ("Ghost" in HA) → `TeslaState`: `sensor.ghost_battery_level` →
+    `batteryPct`; `sensor.ghost_estimate_battery_range` → `rangeKm` (already
+    metric); `lock.ghost_lock` → `locked`; `climate.ghost_climate` →
+    `climateOn`; `sensor.ghost_inside_temperature` → `tempC`;
+    `sensor.ghost_charger_power` → `chargingKw`; status derived from
+    `sensor.ghost_charging` + `device_tracker.ghost_location`. Model name
+    isn't exposed as an entity — hardcode "Model Y".
+  - DIRIGERA → `LightState`: 19 confirmed `light.*` entities, grouped by area
+    prefix (`bedroom_`, `kitchen_`, `living_room_`, `laundry_`, `bathroom_`,
+    `front_door_`). Maps directly onto the existing `Room[]` structure.
+  - `weather.forecast_home` → `OutdoorState` (temperature, humidity). No
+    AQI/PM2.5 source currently — omit those fields or leave blank until an
+    AQI sensor exists.
+
+- **Deferred — not yet available in HA:**
+  - `SwitchState` (plugs/metered switches): no DIRIGERA plug entities exist
+    in HA yet — they may be paired to the hub but not yet added as HA
+    devices. Stub the type/component, don't wire it up this pass.
+  - Per-room `SensorState` (motion/temp/humidity/AQI): these are Matter
+    devices currently only on the Apple Home fabric, not commissioned into
+    HA. Stub/omit per-room sensor cards until they're added via HA's Matter
+    integration.
 - **Camera streams** (Nest doorbell) are out of scope for this build phase
   — they need separate RTSP/WebRTC handling (HA's `go2rtc`) and aren't part
   of the entity/state model above. Don't try to fit them into the same
@@ -165,8 +191,13 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
 
 ## Open questions to confirm before deploying
 
-- Exact HA entity IDs for the Powerwall, solar, grid, and Tesla integration
-  (placeholders above — confirm via Developer Tools → States).
-- Whether the wall tablet runs a browser kiosk pointed at the Vercel
-  deployment, or a local network-only build (affects whether the HA token
-  can ever be client-side vs. needing a small backend proxy).
+- ~~Exact HA entity IDs for the Powerwall, solar, grid, and Tesla
+  integration~~ — confirmed 2026-07-10, see entity mapping above.
+- ~~Whether the wall tablet runs a browser kiosk pointed at the Vercel
+  deployment, or a local network-only build~~ — decided: local-network-only.
+  No public deploy, no backend proxy needed for the token; step 5 (Vercel
+  deploy) is on hold until/unless that changes.
+- DIRIGERA plug/switch devices and Matter environmental sensors (motion/
+  temp/humidity/AQI) exist outside HA (hub-only / Apple Home fabric) and
+  need to be added to HA before `SwitchState` and per-room `SensorState`
+  can be wired up.
