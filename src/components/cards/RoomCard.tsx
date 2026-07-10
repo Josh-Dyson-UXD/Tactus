@@ -1,6 +1,7 @@
 import { COLORS } from "@/types";
 import type { Room, Color } from "@/types";
 import { withAlpha, dominantColor } from "@/lib/helpers";
+import { SunIcon } from "@/components/icons";
 import { BrightnessSlider } from "@/components/controls/BrightnessSlider";
 
 export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorChange }: {
@@ -54,28 +55,41 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
         ))}
       </div>
 
-      {/* Brightness */}
-      <div className="w-full mb-4">
+      {/* Brightness — mirrors LightCard's brightness panel treatment */}
+      <div className="flex flex-col gap-[12px] w-full mb-4">
+        <div className="flex items-center justify-between w-full">
+          <div className="size-[16px]"><SunIcon stroke="var(--tactus-text-secondary)" size={16} /></div>
+          <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
+            <span style={{ fontSize: 24, fontWeight: 600 }}>{isAnyOn ? roomBrightness : 0}</span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}> %</span>
+          </p>
+          <div className="size-[24px]"><SunIcon stroke={isAnyOn ? dominant : "var(--tactus-border-default)"} size={24} /></div>
+        </div>
         <BrightnessSlider value={isAnyOn ? roomBrightness : 0} onChange={(v) => { if (isAnyOn) onBrightnessChange(v); }} accent={isAnyOn ? dominant : "var(--tactus-border-default)"} />
       </div>
 
-      {/* Color swatches + manage */}
-      <div className="flex items-center gap-2 w-full">
-        {COLORS.map((c) => {
-          const isActive = c.id === roomColor.id && isAnyOn;
-          return (
-            <button key={c.id} onClick={() => { if (isAnyOn) onColorChange(c); }} disabled={!isAnyOn} className="relative shrink-0 rounded-full" style={{ width: 24, height: 24, outline: "none", opacity: isAnyOn ? 1 : 0.2, cursor: isAnyOn ? "pointer" : "default" }}>
-              <svg viewBox="0 0 36 36" fill="none" className="size-full">
-                {isActive && <rect x="1" y="1" width="34" height="34" rx="17" stroke={c.hex} strokeWidth="2.5" />}
-                <circle cx="18" cy="18" r={isActive ? 12 : 14} fill={c.hex} />
-              </svg>
-            </button>
-          );
-        })}
-        <button onClick={onNavigate} className="ml-auto flex items-center gap-1 cursor-pointer hover:opacity-70 transition-opacity">
-          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Manage</p>
-          <svg viewBox="0 0 24 24" fill="none" className="size-[12px]"><path d="M9 18L15 12L9 6" stroke="var(--tactus-text-faint)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-        </button>
+      {/* Colour — mirrors LightCard's colour panel treatment */}
+      <div className="flex flex-col gap-[12px] w-full">
+        <div className="flex gap-[12px] items-center w-full">
+          {COLORS.map((c) => {
+            const isActive = c.id === roomColor.id && isAnyOn;
+            return (
+              <button key={c.id} onClick={() => { if (isAnyOn) onColorChange(c); }} disabled={!isAnyOn} className="relative shrink-0 size-[36px] rounded-full cursor-pointer" style={{ outline: "none", opacity: isAnyOn ? 1 : 0.3, cursor: isAnyOn ? "pointer" : "default" }}>
+                <svg viewBox="0 0 36 36" fill="none" className="size-full">
+                  {isActive && <rect x="1" y="1" width="34" height="34" rx="17" stroke={c.hex} strokeWidth="2" />}
+                  <circle cx="18" cy="18" r="14" fill={c.hex} />
+                </svg>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between w-full">
+          <p className="text-[13px] font-normal leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{isAnyOn ? roomColor.label : "All off"}</p>
+          <button onClick={onNavigate} className="flex items-center gap-1 cursor-pointer hover:opacity-70 transition-opacity">
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Manage</p>
+            <svg viewBox="0 0 24 24" fill="none" className="size-[12px]"><path d="M9 18L15 12L9 6" stroke="var(--tactus-text-faint)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+          </button>
+        </div>
       </div>
     </div>
   );

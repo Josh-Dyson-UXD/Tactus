@@ -7,11 +7,12 @@ import { LightCard } from "@/components/cards/LightCard";
 import { SwitchCard } from "@/components/cards/SwitchCard";
 import { SensorCard } from "@/components/cards/SensorCard";
 
-export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor }: {
+export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor, onLightColorTemp }: {
   room: Room; onBack: () => void; onUpdateRoom: (p: Partial<Room>) => void;
   onLightToggle: (entityId: string, on: boolean) => void;
   onLightBrightness: (entityId: string, v: number) => void;
   onLightColor: (entityId: string, c: Color) => void;
+  onLightColorTemp: (entityId: string, kelvin: number) => void;
 }) {
   const { lights, switches, sensors, roomBrightness, roomColor, name } = room;
   const activeCount = lights.filter(l => l.cardState === "on").length + switches.filter(s => s.isOn).length;
@@ -62,6 +63,7 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
                   onToggle={(on) => onLightToggle(l.id, on)}
                   onCommitBrightness={(v) => onLightBrightness(l.id, v)}
                   onCommitColor={(c) => onLightColor(l.id, c)}
+                  onCommitColorTemp={(k) => onLightColorTemp(l.id, k)}
                   onRetry={() => onLightToggle(l.id, true)}
                 />
               ))}
