@@ -16,16 +16,20 @@
   --tactus-bg-recessed:    #0f1117;   /* solar/energy panel background */
   --tactus-bg-track:       rgba(255, 255, 255, 0.06); /* slider track, inactive fill */
   --tactus-bg-hairline:    rgba(255, 255, 255, 0.02);  /* faintest icon-chip bg, off state */
+  --tactus-bg-overlay:     rgba(255, 255, 255, 0.04);  /* off-state interactive surface / button bg */
+  --tactus-bg-blur:        rgba(11, 12, 16, 0.9);      /* sticky header backdrop-blur bg */
 
   /* ── Borders ───────────────────────────────────────────────────────── */
   --tactus-border-default: #242936;
   --tactus-border-subtle:  #1e2530;
   --tactus-border-error:   #EF4444;
+  --tactus-border-overlay: rgba(255, 255, 255, 0.08);  /* subtle overlay border, off-state buttons */
 
   /* ── Text ──────────────────────────────────────────────────────────── */
   --tactus-text-primary:   #f8fafc;   /* device names, on-state labels, big numerals */
   --tactus-text-secondary: #94a3b8;   /* off-state device names, body copy */
   --tactus-text-muted:     #475569;   /* off-state labels, helper text, units */
+  --tactus-text-dim:       #64748b;   /* numeral unit labels (slate-500, between muted/secondary) */
   --tactus-text-faint:     #334155;   /* eyebrow labels ("NOW", "TODAY", "CO₂") */
 
   /* ── Semantic state colours ───────────────────────────────────────────
@@ -118,6 +122,7 @@
   --color-tactus-text-primary:   var(--tactus-text-primary);
   --color-tactus-text-secondary: var(--tactus-text-secondary);
   --color-tactus-text-muted:     var(--tactus-text-muted);
+  --color-tactus-text-dim:       var(--tactus-text-dim);
   --color-tactus-text-faint:     var(--tactus-text-faint);
 
   --color-tactus-amber: var(--tactus-amber);
