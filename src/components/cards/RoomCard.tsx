@@ -1,14 +1,23 @@
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { COLORS } from "@/types";
 import type { Room, Color } from "@/types";
-import { withAlpha, dominantColor } from "@/lib/helpers";
+import { withAlpha, dominantColor, kelvinToHex } from "@/lib/helpers";
 import { SunIcon } from "@/components/icons";
 import { BrightnessSlider } from "@/components/controls/BrightnessSlider";
+import { ColorTempSlider } from "@/components/controls/ColorTempSlider";
 
-export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorChange }: {
+type Panel = "summary" | "brightness" | "color";
+
+export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorChange, onColorTempChange }: {
   room: Room; onNavigate: () => void; onToggleAll: (on: boolean) => void;
-  onBrightnessChange: (v: number) => void; onColorChange: (c: Color) => void;
+  onBrightnessChange: (v: number) => void;
+  onColorChange: (c: Color) => void;
+  onColorTempChange: (kelvin: number) => void;
 }) {
   const { name, lights, switches, sensors, roomBrightness, roomColor } = room;
+  const [panel, setPanel] = useState<Panel>("summary");
+
   const activeLights   = lights.filter((l) => l.cardState === "on").length;
   const activeSwitches = switches.filter((s) => s.isOn).length;
   const hasError       = lights.some((l) => l.cardState === "error");
@@ -18,10 +27,27 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
   const tempSensor     = sensors.find((s) => s.data.kind === "temp");
   const motionSensor   = sensors.find((s) => s.data.kind === "motion");
 
+  // Room-level colour capability, derived from the room's actual lights —
+  // not assumed. Majority vote across colour-capable lights decides which
+  // picker the room shows; rooms with no colour-capable lights get no
+  // colour control at all. See CLAUDE.md and LightCard's own colorMode gating.
+  const colorCapable = lights.filter((l) => l.colorMode !== "brightness");
+  const rgbCount  = colorCapable.filter((l) => l.colorMode === "rgb").length;
+  const tempLights = colorCapable.filter((l) => l.colorMode === "temp");
+  const roomColorMode: "rgb" | "temp" | null =
+    colorCapable.length === 0 ? null : rgbCount >= tempLights.length ? "rgb" : "temp";
+  const roomTempRange = tempLights.find((l) => l.colorTempRange)?.colorTempRange;
+  const onTempLights = tempLights.filter((l) => (l.cardState === "on" || l.cardState === "pending") && l.colorTempKelvin !== undefined);
+  const roomColorTempKelvin = onTempLights.length
+    ? Math.round(onTempLights.reduce((s, l) => s + (l.colorTempKelvin ?? 0), 0) / onTempLights.length)
+    : roomTempRange ? Math.round((roomTempRange.min + roomTempRange.max) / 2) : undefined;
+  const hasColorPanel = roomColorMode === "rgb" || (roomColorMode === "temp" && roomTempRange !== undefined);
+
   return (
-    <div className="relative flex flex-col p-6 rounded-tactus-2xl w-full" style={{ background: allOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)", border: hasError ? `1px solid ${withAlpha("#EF4444", 0.4)}` : "1px solid var(--tactus-border-default)", boxShadow: isAnyOn ? `0 16px 40px 0 ${withAlpha(dominant, 0.07)}` : "none" }}>
+    <div className="relative flex flex-col p-6 rounded-tactus-2xl w-full" style={{ background: allOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)", border: hasError ? `1px solid ${withAlpha("#EF4444", 0.4)}` : "1px solid var(--tactus-border-default)", boxShadow: isAnyOn ? `0 16px 40px 0 ${withAlpha(dominant, 0.07)}` : "none" }}
+      onClick={() => setPanel("summary")}>
       {/* Top row */}
-      <button className="flex items-start justify-between w-full mb-5 text-left cursor-pointer hover:opacity-90 transition-opacity" onClick={onNavigate}>
+      <button className="flex items-start justify-between w-full mb-5 text-left cursor-pointer hover:opacity-90 transition-opacity" onClick={(e) => { e.stopPropagation(); onNavigate(); }}>
         <div className="flex flex-col gap-1.5">
           <h2 className="text-[22px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: allOff ? "var(--tactus-text-dim)" : "var(--tactus-text-primary)" }}>{name}</h2>
           <div className="flex items-center gap-3">
@@ -55,42 +81,79 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
         ))}
       </div>
 
-      {/* Brightness — mirrors LightCard's brightness panel treatment */}
-      <div className="flex flex-col gap-[12px] w-full mb-4">
-        <div className="flex items-center justify-between w-full">
-          <div className="size-[16px]"><SunIcon stroke="var(--tactus-text-secondary)" size={16} /></div>
-          <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
-            <span style={{ fontSize: 24, fontWeight: 600 }}>{isAnyOn ? roomBrightness : 0}</span>
-            <span style={{ fontSize: 14, fontWeight: 600 }}> %</span>
-          </p>
-          <div className="size-[24px]"><SunIcon stroke={isAnyOn ? dominant : "var(--tactus-border-default)"} size={24} /></div>
-        </div>
-        <BrightnessSlider value={isAnyOn ? roomBrightness : 0} onChange={(v) => { if (isAnyOn) onBrightnessChange(v); }} accent={isAnyOn ? dominant : "var(--tactus-border-default)"} />
+      {/* Bottom panel — mirrors LightCard's summary → brightness/color state machine */}
+      <div className="w-full shrink-0" style={{ height: 100 }} onClick={(e) => e.stopPropagation()}>
+        <AnimatePresence mode="wait">
+          {!isAnyOn ? (
+            <motion.div key="off" className="flex items-start justify-center w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+              <div className="flex gap-[40px] items-center justify-center flex-1">
+                <div className="size-[32px]"><SunIcon stroke="var(--tactus-border-default)" size={32} /></div>
+                {hasColorPanel && <div className="size-[32px] rounded-full" style={{ background: "var(--tactus-border-default)" }} />}
+              </div>
+            </motion.div>
+          ) : panel === "summary" ? (
+            <motion.div key="sum" className="flex items-center justify-center w-full h-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+              <div className="flex gap-[40px] items-center justify-center flex-1">
+                <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPanel("brightness")}>
+                  <div className="size-[32px]"><SunIcon stroke="var(--tactus-text-secondary)" size={32} /></div>
+                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{roomBrightness}%</p>
+                </button>
+                {hasColorPanel && (
+                  <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPanel("color")}>
+                    <div className="size-[32px] rounded-full" style={{ background: roomColorMode === "temp" && roomColorTempKelvin ? kelvinToHex(roomColorTempKelvin) : roomColor.hex }} />
+                    <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>
+                      {roomColorMode === "temp" && roomColorTempKelvin ? `${Math.round(roomColorTempKelvin / 100) * 100}K` : roomColor.label.split(" ")[0]}
+                    </p>
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          ) : panel === "brightness" ? (
+            <motion.div key="br" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+              <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => setPanel("summary")}>
+                <div className="size-[16px]"><SunIcon stroke="var(--tactus-text-secondary)" size={16} /></div>
+                <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
+                  <span style={{ fontSize: 24, fontWeight: 600 }}>{roomBrightness}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}> %</span>
+                </p>
+                <div className="size-[24px]"><SunIcon stroke={dominant} size={24} /></div>
+              </button>
+              <BrightnessSlider value={roomBrightness} onChange={onBrightnessChange} accent={dominant} />
+            </motion.div>
+          ) : panel === "color" && roomColorMode === "temp" && roomTempRange ? (
+            <motion.div key="temp" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+              <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => setPanel("summary")}>
+                <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(roomTempRange.min) }} />
+                <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
+                  <span style={{ fontSize: 24, fontWeight: 600 }}>{roomColorTempKelvin ?? roomTempRange.min}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}> K</span>
+                </p>
+                <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(roomTempRange.max) }} />
+              </button>
+              <ColorTempSlider value={roomColorTempKelvin ?? roomTempRange.min} min={roomTempRange.min} max={roomTempRange.max} onChange={onColorTempChange} />
+            </motion.div>
+          ) : panel === "color" && roomColorMode === "rgb" ? (
+            <motion.div key="col" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+              <div className="flex gap-[12px] items-center w-full">
+                {COLORS.map((c) => (
+                  <button key={c.id} className="relative shrink-0 size-[36px] rounded-full cursor-pointer" onClick={() => onColorChange(c as Color)}>
+                    <svg viewBox="0 0 36 36" fill="none" className="size-full">
+                      {c.id === roomColor.id && <rect x="1" y="1" width="34" height="34" rx="17" stroke={c.hex} strokeWidth="2" />}
+                      <circle cx="18" cy="18" r="14" fill={c.hex} />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[13px] font-normal leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{roomColor.label}</p>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
 
-      {/* Colour — mirrors LightCard's colour panel treatment */}
-      <div className="flex flex-col gap-[12px] w-full">
-        <div className="flex gap-[12px] items-center w-full">
-          {COLORS.map((c) => {
-            const isActive = c.id === roomColor.id && isAnyOn;
-            return (
-              <button key={c.id} onClick={() => { if (isAnyOn) onColorChange(c); }} disabled={!isAnyOn} className="relative shrink-0 size-[36px] rounded-full cursor-pointer" style={{ outline: "none", opacity: isAnyOn ? 1 : 0.3, cursor: isAnyOn ? "pointer" : "default" }}>
-                <svg viewBox="0 0 36 36" fill="none" className="size-full">
-                  {isActive && <rect x="1" y="1" width="34" height="34" rx="17" stroke={c.hex} strokeWidth="2" />}
-                  <circle cx="18" cy="18" r="14" fill={c.hex} />
-                </svg>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center justify-between w-full">
-          <p className="text-[13px] font-normal leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{isAnyOn ? roomColor.label : "All off"}</p>
-          <button onClick={onNavigate} className="flex items-center gap-1 cursor-pointer hover:opacity-70 transition-opacity">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Manage</p>
-            <svg viewBox="0 0 24 24" fill="none" className="size-[12px]"><path d="M9 18L15 12L9 6" stroke="var(--tactus-text-faint)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-          </button>
-        </div>
-      </div>
+      <button onClick={(e) => { e.stopPropagation(); onNavigate(); }} className="mt-3 flex items-center gap-1 self-end cursor-pointer hover:opacity-70 transition-opacity">
+        <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Manage</p>
+        <svg viewBox="0 0 24 24" fill="none" className="size-[12px]"><path d="M9 18L15 12L9 6" stroke="var(--tactus-text-faint)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+      </button>
     </div>
   );
 }

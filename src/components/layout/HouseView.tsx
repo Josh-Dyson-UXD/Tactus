@@ -12,13 +12,15 @@ import { RoomCard } from "@/components/cards/RoomCard";
 
 type ControlStatus = "idle" | "pending" | "error";
 
-export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, onUpdateRoom, teslaControl, onToggleTeslaClimate, onToggleTeslaLock }: {
+export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, onUpdateRoom, teslaControl, onToggleTeslaClimate, onToggleTeslaLock, onRoomColor, onRoomColorTemp }: {
   rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState;
   onNavigate: (id: string) => void;
   onUpdateRoom: (id: string, p: Partial<Room>) => void;
   teslaControl: { climate: ControlStatus; lock: ControlStatus };
   onToggleTeslaClimate: () => void;
   onToggleTeslaLock: () => void;
+  onRoomColor: (room: Room, c: Color) => void;
+  onRoomColorTemp: (room: Room, kelvin: number) => void;
 }) {
   const [houseBrightness, setHouseBrightness] = useState(75);
   const [houseColor, setHouseColor] = useState<Color>(COLORS[0]);
@@ -44,7 +46,6 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
     switches: room.switches.map((s) => ({ ...s, isOn: on, wattsNow: on ? s.wattsNow || 45 : 0 })),
   });
   const handleRoomBrightness = (room: Room, v: number) => onUpdateRoom(room.id, { roomBrightness: v, lights: room.lights.map((l) => l.cardState !== "on" ? l : { ...l, brightness: v }) });
-  const handleRoomColor = (room: Room, c: Color) => onUpdateRoom(room.id, { roomColor: c, lights: room.lights.map((l) => l.cardState !== "on" ? l : { ...l, selectedColor: c }) });
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
@@ -82,7 +83,8 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
                 onNavigate={() => onNavigate(room.id)}
                 onToggleAll={(on) => toggleRoom(room, on)}
                 onBrightnessChange={(v) => handleRoomBrightness(room, v)}
-                onColorChange={(c) => handleRoomColor(room, c)}
+                onColorChange={(c) => onRoomColor(room, c)}
+                onColorTempChange={(k) => onRoomColorTemp(room, k)}
               />
             ))}
           </div>
