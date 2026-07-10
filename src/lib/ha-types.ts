@@ -43,6 +43,13 @@ function num(states: HAStateMap, id: string, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// HA sensors often report many decimal places (e.g. 85.0161988630409). The UI
+// expects clean numerals — round to a fixed precision before display.
+function round(n: number, decimals: number): number {
+  const f = 10 ** decimals;
+  return Math.round(n * f) / f;
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -119,10 +126,10 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
 export function mapHAStatesToSolar(states: HAStateMap): SolarState {
   // sensor.home_solar_power is already in kW (small instantaneous values,
   // e.g. 0.581) — do NOT divide by 1000 here, that was wrong for this entity.
-  const generatingKw = num(states, HA_ENTITIES.solarPower);
+  const generatingKw = round(num(states, HA_ENTITIES.solarPower), 1);
   return {
     generatingKw,
-    todayKwh: num(states, HA_ENTITIES.solarEnergyToday),
+    todayKwh: round(num(states, HA_ENTITIES.solarEnergyToday), 1),
     // Hourly generation isn't in a single state snapshot — it needs HA's
     // history/statistics API. Left flat until that's wired up.
     hourly: Array(24).fill(0),
@@ -131,15 +138,15 @@ export function mapHAStatesToSolar(states: HAStateMap): SolarState {
 }
 
 export function mapHAStatesToPowerwall(states: HAStateMap): PowerwallState {
-  const pct = num(states, HA_ENTITIES.powerwallCharge);
+  const pct = round(num(states, HA_ENTITIES.powerwallCharge), 0);
   // sensor.home_battery_power is already in kW — confirm the sign convention
   // against your actual Powerwall install (positive vs negative for
   // charge/discharge) before trusting the "charging"/"discharging" label below.
-  const flowKw = num(states, HA_ENTITIES.powerwallFlow);
+  const flowKw = round(num(states, HA_ENTITIES.powerwallFlow), 1);
   const reservePct = num(states, HA_ENTITIES.powerwallReserve);
   const status: PowerwallState["status"] =
     flowKw > 0.05 ? "charging" : flowKw < -0.05 ? "discharging" : pct <= reservePct ? "backup" : "standby";
-  return { pct, flowKw: Math.abs(flowKw), reservePct, status };
+  return { pct, flowKw: round(Math.abs(flowKw), 1), reservePct, status };
 }
 
 export function mapHAStatesToGrid(states: HAStateMap): GridState {
@@ -149,8 +156,8 @@ export function mapHAStatesToGrid(states: HAStateMap): GridState {
   // matches reality once live (may need flipping).
   const gridKw = num(states, HA_ENTITIES.gridPower);
   return {
-    importKw: Math.max(0, gridKw),
-    exportKw: Math.max(0, -gridKw),
+    importKw: round(Math.max(0, gridKw), 1),
+    exportKw: round(Math.max(0, -gridKw), 1),
   };
 }
 
@@ -160,14 +167,14 @@ export function mapHAStatesToTesla(states: HAStateMap): TeslaState {
   const lock = states[HA_ENTITIES.teslaLock];
   const trackerState = tracker?.state ?? "home"; // "not_home" | "home" from device_tracker.ghost_location
   // sensor.ghost_charger_power is already in kW.
-  const chargingKw = num(states, HA_ENTITIES.teslaChargerPower);
+  const chargingKw = round(num(states, HA_ENTITIES.teslaChargerPower), 1);
   const status: TeslaState["status"] = chargingKw > 0.05 ? "charging" : trackerState !== "home" ? "away" : "parked";
 
   return {
     // Model name isn't exposed as an HA entity/attribute — hardcoded per CLAUDE.md.
     model: "Model Y",
-    batteryPct: num(states, HA_ENTITIES.teslaBattery),
-    rangeKm: num(states, HA_ENTITIES.teslaRange), // already km
+    batteryPct: round(num(states, HA_ENTITIES.teslaBattery), 0),
+    rangeKm: round(num(states, HA_ENTITIES.teslaRange), 0), // already km
     status,
     chargingKw: status === "charging" ? chargingKw : undefined,
     tempC: num(states, HA_ENTITIES.teslaInsideTemp),
