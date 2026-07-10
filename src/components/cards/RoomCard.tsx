@@ -45,9 +45,9 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
       {/* Light dots */}
       <div className="flex items-center gap-2 flex-wrap mb-4">
         {lights.map((l) => {
-          const on = l.cardState === "on", err = l.cardState === "error";
-          const dc = err ? "var(--tactus-red)" : on ? l.selectedColor.hex : "var(--tactus-border-subtle)";
-          return <div key={l.id} className="rounded-full shrink-0" title={`${l.device}`} style={{ width: 10, height: 10, background: dc, boxShadow: on ? `0 0 8px 0 ${withAlpha(l.selectedColor.hex, 0.5)}` : "none" }} />;
+          const on = l.cardState === "on", err = l.cardState === "error", pending = l.cardState === "pending";
+          const dc = err ? "var(--tactus-red)" : (on || pending) ? l.selectedColor.hex : "var(--tactus-border-subtle)";
+          return <div key={l.id} className="rounded-full shrink-0" title={`${l.device}`} style={{ width: 10, height: 10, background: dc, boxShadow: on ? `0 0 8px 0 ${withAlpha(l.selectedColor.hex, 0.5)}` : "none", animation: pending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined }} />;
         })}
         {switches.map((s) => (
           <div key={s.id} className="rounded-sm shrink-0" title={`${s.device}`} style={{ width: 10, height: 10, background: s.isOn ? "var(--tactus-green)" : "var(--tactus-border-subtle)", boxShadow: s.isOn ? `0 0 8px 0 ${withAlpha("#22C55E", 0.5)}` : "none" }} />

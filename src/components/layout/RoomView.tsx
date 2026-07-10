@@ -1,4 +1,4 @@
-import type { Room, LightState, SwitchState } from "@/types";
+import type { Room, LightState, SwitchState, Color } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { ChevronLeft } from "@/components/icons";
 import { RoomControls } from "@/components/controls/RoomControls";
@@ -7,7 +7,12 @@ import { LightCard } from "@/components/cards/LightCard";
 import { SwitchCard } from "@/components/cards/SwitchCard";
 import { SensorCard } from "@/components/cards/SensorCard";
 
-export function RoomView({ room, onBack, onUpdateRoom }: { room: Room; onBack: () => void; onUpdateRoom: (p: Partial<Room>) => void }) {
+export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor }: {
+  room: Room; onBack: () => void; onUpdateRoom: (p: Partial<Room>) => void;
+  onLightToggle: (entityId: string, on: boolean) => void;
+  onLightBrightness: (entityId: string, v: number) => void;
+  onLightColor: (entityId: string, c: Color) => void;
+}) {
   const { lights, switches, sensors, roomBrightness, roomColor, name } = room;
   const activeCount = lights.filter(l => l.cardState === "on").length + switches.filter(s => s.isOn).length;
   const totalCount  = lights.length + switches.length;
@@ -51,7 +56,15 @@ export function RoomView({ room, onBack, onUpdateRoom }: { room: Room; onBack: (
           <div>
             <SectionHeading label="Lights" count={lights.length} />
             <div className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", alignItems: "start" }}>
-              {lights.map((l) => <LightCard key={l.id} state={l} onChange={(p) => updateLight(l.id, p)} />)}
+              {lights.map((l) => (
+                <LightCard key={l.id} state={l}
+                  onChange={(p) => updateLight(l.id, p)}
+                  onToggle={(on) => onLightToggle(l.id, on)}
+                  onCommitBrightness={(v) => onLightBrightness(l.id, v)}
+                  onCommitColor={(c) => onLightColor(l.id, c)}
+                  onRetry={() => onLightToggle(l.id, true)}
+                />
+              ))}
             </div>
           </div>
         )}

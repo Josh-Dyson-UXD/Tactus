@@ -4,10 +4,23 @@ import { withAlpha } from "@/lib/helpers";
 
 const TESLA_COLOR = "#3B82F6";
 
-export function TeslaCard({ tesla, onChange }: { tesla: TeslaState; onChange: (p: Partial<TeslaState>) => void }) {
+type ControlStatus = "idle" | "pending" | "error";
+
+export function TeslaCard({ tesla, climateControl, lockControl, onToggleClimate, onToggleLock }: {
+  tesla: TeslaState;
+  climateControl: ControlStatus;
+  lockControl: ControlStatus;
+  onToggleClimate: () => void;
+  onToggleLock: () => void;
+}) {
   const isCharging = tesla.status === "charging";
   const r = 54, circ = 2 * Math.PI * r;
   const filled = circ * (tesla.batteryPct / 100);
+
+  const climateError = climateControl === "error";
+  const climatePending = climateControl === "pending";
+  const lockError = lockControl === "error";
+  const lockPending = lockControl === "pending";
 
   return (
     <div className="relative flex flex-col p-6 rounded-tactus-2xl" style={{ background: "var(--tactus-bg-raised)", border: "1px solid var(--tactus-border-default)", boxShadow: `0 20px 40px 0 ${withAlpha(TESLA_COLOR, 0.04)}` }}>
@@ -57,24 +70,38 @@ export function TeslaCard({ tesla, onChange }: { tesla: TeslaState; onChange: (p
       {/* Controls */}
       <div className="flex gap-3 pt-4" style={{ borderTop: "1px solid var(--tactus-bg-overlay)" }}>
         {/* Climate */}
-        <button onClick={() => onChange({ climateOn: !tesla.climateOn })}
+        <button onClick={onToggleClimate} disabled={climatePending}
           className="flex items-center gap-2 flex-1 px-3 py-2.5 rounded-tactus-md cursor-pointer transition-opacity hover:opacity-80"
-          style={{ background: tesla.climateOn ? withAlpha("#3B82F6", 0.12) : "var(--tactus-bg-overlay)", border: `1px solid ${tesla.climateOn ? withAlpha("#3B82F6", 0.25) : "var(--tactus-border-overlay)"}` }}>
+          style={{
+            background: climateError ? withAlpha("#EF4444", 0.1) : tesla.climateOn ? withAlpha("#3B82F6", 0.12) : "var(--tactus-bg-overlay)",
+            border: `1px solid ${climateError ? withAlpha("#EF4444", 0.3) : tesla.climateOn ? withAlpha("#3B82F6", 0.25) : "var(--tactus-border-overlay)"}`,
+            animation: climatePending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined,
+          }}>
           <svg viewBox="0 0 24 24" fill="none" className="size-4 shrink-0">
-            <path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07l14.14-14.14" stroke={tesla.climateOn ? "var(--tactus-blue)" : "var(--tactus-text-muted)"} strokeLinecap="round" strokeWidth="1.5" />
+            <path d="M12 2v20M4.93 4.93l14.14 14.14M2 12h20M4.93 19.07l14.14-14.14" stroke={climateError ? "var(--tactus-red)" : tesla.climateOn ? "var(--tactus-blue)" : "var(--tactus-text-muted)"} strokeLinecap="round" strokeWidth="1.5" />
           </svg>
-          <p className="text-[12px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: tesla.climateOn ? "var(--tactus-blue)" : "var(--tactus-text-muted)" }}>Climate</p>
+          <p className="text-[12px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: climateError ? "var(--tactus-red)" : tesla.climateOn ? "var(--tactus-blue)" : "var(--tactus-text-muted)" }}>
+            {climatePending ? "Syncing…" : climateError ? "Unreachable" : "Climate"}
+          </p>
         </button>
         {/* Lock */}
-        <button onClick={() => onChange({ locked: !tesla.locked })}
+        <button onClick={onToggleLock} disabled={lockPending}
           className="flex items-center gap-2 flex-1 px-3 py-2.5 rounded-tactus-md cursor-pointer transition-opacity hover:opacity-80"
-          style={{ background: "var(--tactus-bg-overlay)", border: "1px solid var(--tactus-border-overlay)" }}>
+          style={{
+            background: lockError ? withAlpha("#EF4444", 0.1) : "var(--tactus-bg-overlay)",
+            border: `1px solid ${lockError ? withAlpha("#EF4444", 0.3) : "var(--tactus-border-overlay)"}`,
+            animation: lockPending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined,
+          }}>
           <svg viewBox="0 0 24 24" fill="none" className="size-4 shrink-0">
-            {tesla.locked
+            {lockError
+              ? <><rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--tactus-red)" strokeWidth="1.5" /><path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="var(--tactus-red)" strokeLinecap="round" strokeWidth="1.5" /></>
+              : tesla.locked
               ? <><rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--tactus-green)" strokeWidth="1.5" /><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="var(--tactus-green)" strokeLinecap="round" strokeWidth="1.5" /></>
               : <><rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--tactus-text-muted)" strokeWidth="1.5" /><path d="M7 11V7a5 5 0 0 1 9.9-1" stroke="var(--tactus-text-muted)" strokeLinecap="round" strokeWidth="1.5" /></>}
           </svg>
-          <p className="text-[12px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: tesla.locked ? "var(--tactus-green)" : "var(--tactus-text-muted)" }}>{tesla.locked ? "Locked" : "Unlocked"}</p>
+          <p className="text-[12px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: lockError ? "var(--tactus-red)" : tesla.locked ? "var(--tactus-green)" : "var(--tactus-text-muted)" }}>
+            {lockPending ? "Syncing…" : lockError ? "Unreachable" : tesla.locked ? "Locked" : "Unlocked"}
+          </p>
         </button>
       </div>
     </div>
