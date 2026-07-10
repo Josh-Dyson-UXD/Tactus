@@ -8,7 +8,7 @@ export function withAlpha(hex: string, alpha: number) {
 }
 
 export function dominantColor(lights: LightState[]): string {
-  const on = lights.filter((l) => l.cardState === "on");
+  const on = lights.filter((l) => l.cardState === "on" || l.cardState === "pending");
   if (!on.length) return "#242936";
   const freq: Record<string, number> = {};
   on.forEach((l) => { freq[l.selectedColor.hex] = (freq[l.selectedColor.hex] ?? 0) + 1; });

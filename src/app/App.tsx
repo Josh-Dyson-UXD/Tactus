@@ -153,6 +153,18 @@ export default function App() {
     controlLight(entityId, "turn_on", { color_temp_kelvin: kelvin });
   }, [controlLight]);
 
+  // Room-level colour bulk-apply: only send the service call to lights that
+  // actually support the mode being applied (RoomCard already gates which
+  // picker is shown by majority colorMode, but a room can still mix
+  // capabilities) — silently skip the rest, no error surfaced for them.
+  const handleRoomColor = useCallback((room: Room, color: Color) => {
+    room.lights.forEach((l) => { if (l.colorMode === "rgb" && l.cardState === "on") handleLightColor(l.id, color); });
+  }, [handleLightColor]);
+
+  const handleRoomColorTemp = useCallback((room: Room, kelvin: number) => {
+    room.lights.forEach((l) => { if (l.colorMode === "temp" && l.cardState === "on") handleLightColorTemp(l.id, kelvin); });
+  }, [handleLightColorTemp]);
+
   // ─── Tesla control: pending → confirmed cycle ────────────────────────────
   const controlTesla = useCallback((key: "climate" | "lock", domain: string, service: string, entityId: string) => {
     const client = clientRef.current;
@@ -209,7 +221,8 @@ export default function App() {
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
           <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor}
             onNavigate={setRoomId} onUpdateRoom={updateRoom}
-            teslaControl={teslaControl} onToggleTeslaClimate={handleToggleTeslaClimate} onToggleTeslaLock={handleToggleTeslaLock} />
+            teslaControl={teslaControl} onToggleTeslaClimate={handleToggleTeslaClimate} onToggleTeslaLock={handleToggleTeslaLock}
+            onRoomColor={handleRoomColor} onRoomColorTemp={handleRoomColorTemp} />
         </motion.div>
       )}
     </AnimatePresence>
