@@ -165,6 +165,19 @@ export default function App() {
     room.lights.forEach((l) => { if (l.colorMode === "temp" && l.cardState === "on") handleLightColorTemp(l.id, kelvin); });
   }, [handleLightColorTemp]);
 
+  // Room-level bulk toggle/brightness: no separate room-level pending state —
+  // each affected light fires its own independent controlLight() call and
+  // rides the same per-light pending → confirmed cycle from step 4. The
+  // room card's dots/aggregates are already computed from real cardState,
+  // so they reflect reality as each light confirms independently.
+  const handleRoomToggle = useCallback((room: Room, on: boolean) => {
+    room.lights.forEach((l) => { if (l.cardState !== "error") handleLightToggle(l.id, on); });
+  }, [handleLightToggle]);
+
+  const handleRoomBrightness = useCallback((room: Room, brightnessPct: number) => {
+    room.lights.forEach((l) => { if (l.cardState === "on") handleLightBrightness(l.id, brightnessPct); });
+  }, [handleLightBrightness]);
+
   // ─── Tesla control: pending → confirmed cycle ────────────────────────────
   const controlTesla = useCallback((key: "climate" | "lock", domain: string, service: string, entityId: string) => {
     const client = clientRef.current;
@@ -222,7 +235,8 @@ export default function App() {
           <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor}
             onNavigate={setRoomId} onUpdateRoom={updateRoom}
             teslaControl={teslaControl} onToggleTeslaClimate={handleToggleTeslaClimate} onToggleTeslaLock={handleToggleTeslaLock}
-            onRoomColor={handleRoomColor} onRoomColorTemp={handleRoomColorTemp} />
+            onRoomColor={handleRoomColor} onRoomColorTemp={handleRoomColorTemp}
+            onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness} />
         </motion.div>
       )}
     </AnimatePresence>
