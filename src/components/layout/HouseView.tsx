@@ -12,7 +12,7 @@ import { RoomCard } from "@/components/cards/RoomCard";
 
 type ControlStatus = "idle" | "pending" | "error";
 
-export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, onUpdateRoom, teslaControl, onToggleTeslaClimate, onToggleTeslaLock, onRoomColor, onRoomColorTemp }: {
+export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, onUpdateRoom, teslaControl, onToggleTeslaClimate, onToggleTeslaLock, onRoomColor, onRoomColorTemp, onRoomToggle, onRoomBrightness }: {
   rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState;
   onNavigate: (id: string) => void;
   onUpdateRoom: (id: string, p: Partial<Room>) => void;
@@ -21,6 +21,8 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
   onToggleTeslaLock: () => void;
   onRoomColor: (room: Room, c: Color) => void;
   onRoomColorTemp: (room: Room, kelvin: number) => void;
+  onRoomToggle: (room: Room, on: boolean) => void;
+  onRoomBrightness: (room: Room, v: number) => void;
 }) {
   const [houseBrightness, setHouseBrightness] = useState(75);
   const [houseColor, setHouseColor] = useState<Color>(COLORS[0]);
@@ -41,12 +43,6 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
     setHouseColor(c);
     rooms.forEach((r) => onUpdateRoom(r.id, { roomColor: c, lights: r.lights.map((l) => l.cardState !== "on" ? l : { ...l, selectedColor: c }) }));
   };
-  const toggleRoom = (room: Room, on: boolean) => onUpdateRoom(room.id, {
-    lights: room.lights.map((l) => l.cardState === "error" ? l : { ...l, cardState: on ? "on" : "off", panel: "summary" }),
-    switches: room.switches.map((s) => ({ ...s, isOn: on, wattsNow: on ? s.wattsNow || 45 : 0 })),
-  });
-  const handleRoomBrightness = (room: Room, v: number) => onUpdateRoom(room.id, { roomBrightness: v, lights: room.lights.map((l) => l.cardState !== "on" ? l : { ...l, brightness: v }) });
-
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
       <div className="sticky top-0 z-10" style={{ background: "var(--tactus-bg-blur)", backdropFilter: "blur(16px)", borderBottom: "1px solid var(--tactus-bg-overlay)" }}>
@@ -81,8 +77,8 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
             {rooms.map((room) => (
               <RoomCard key={room.id} room={room}
                 onNavigate={() => onNavigate(room.id)}
-                onToggleAll={(on) => toggleRoom(room, on)}
-                onBrightnessChange={(v) => handleRoomBrightness(room, v)}
+                onToggleAll={(on) => onRoomToggle(room, on)}
+                onBrightnessChange={(v) => onRoomBrightness(room, v)}
                 onColorChange={(c) => onRoomColor(room, c)}
                 onColorTempChange={(k) => onRoomColorTemp(room, k)}
               />
