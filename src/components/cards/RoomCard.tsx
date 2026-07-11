@@ -67,13 +67,18 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
   const handleBrightnessChange = (v: number) => {
     setLocalBrightness(v);
     if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
-    brightnessTimer.current = setTimeout(() => onBrightnessChange(v), COMMIT_DELAY);
+    // Clear the local shadow value once committed, so the display goes back
+    // to tracking the real (confirmed) roomBrightness prop afterward — without
+    // this, the room card would stay frozen at whatever was last dragged and
+    // never reflect subsequent real changes (individual lights, physical
+    // switches, etc.).
+    brightnessTimer.current = setTimeout(() => { onBrightnessChange(v); setLocalBrightness(null); }, COMMIT_DELAY);
   };
 
   const handleColorTempChange = (kelvin: number) => {
     setLocalKelvin(kelvin);
     if (colorTempTimer.current) clearTimeout(colorTempTimer.current);
-    colorTempTimer.current = setTimeout(() => onColorTempChange(kelvin), COMMIT_DELAY);
+    colorTempTimer.current = setTimeout(() => { onColorTempChange(kelvin); setLocalKelvin(null); }, COMMIT_DELAY);
   };
 
   return (
