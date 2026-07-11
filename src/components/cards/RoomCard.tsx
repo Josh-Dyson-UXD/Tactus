@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { COLORS } from "@/types";
 import type { Room, Color } from "@/types";
@@ -9,6 +9,8 @@ import { ColorTempSlider } from "@/components/controls/ColorTempSlider";
 
 type Panel = "summary" | "brightness" | "color";
 
+const COMMIT_DELAY = 400;
+
 export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorChange, onColorTempChange }: {
   room: Room; onNavigate: () => void; onToggleAll: (on: boolean) => void;
   onBrightnessChange: (v: number) => void;
@@ -17,6 +19,22 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
 }) {
   const { name, lights, switches, sensors, roomBrightness, roomColor } = room;
   const [panel, setPanel] = useState<Panel>("summary");
+
+  // Local optimistic value + debounce — dragging updates the numeral/thumb
+  // instantly and smoothly, but onBrightnessChange/onColorTempChange (which
+  // fan out to a real light.turn_on per light in the room) only fire once,
+  // 400ms after the last movement. Same pattern as LightCard's
+  // handleBrightnessChange/handleColorTempChange — without it, one drag
+  // floods the Zigbee mesh with a service call per pixel across every light
+  // in the room, and they miss the pending-confirm window and land in error.
+  const [localBrightness, setLocalBrightness] = useState<number | null>(null);
+  const [localKelvin, setLocalKelvin] = useState<number | null>(null);
+  const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const colorTempTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
+    if (colorTempTimer.current) clearTimeout(colorTempTimer.current);
+  }, []);
 
   const activeLights   = lights.filter((l) => l.cardState === "on").length;
   const activeSwitches = switches.filter((s) => s.isOn).length;
@@ -42,6 +60,21 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
     ? Math.round(onTempLights.reduce((s, l) => s + (l.colorTempKelvin ?? 0), 0) / onTempLights.length)
     : roomTempRange ? Math.round((roomTempRange.min + roomTempRange.max) / 2) : undefined;
   const hasColorPanel = roomColorMode === "rgb" || (roomColorMode === "temp" && roomTempRange !== undefined);
+
+  const displayBrightness = localBrightness ?? roomBrightness;
+  const displayKelvin = localKelvin ?? roomColorTempKelvin;
+
+  const handleBrightnessChange = (v: number) => {
+    setLocalBrightness(v);
+    if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
+    brightnessTimer.current = setTimeout(() => onBrightnessChange(v), COMMIT_DELAY);
+  };
+
+  const handleColorTempChange = (kelvin: number) => {
+    setLocalKelvin(kelvin);
+    if (colorTempTimer.current) clearTimeout(colorTempTimer.current);
+    colorTempTimer.current = setTimeout(() => onColorTempChange(kelvin), COMMIT_DELAY);
+  };
 
   return (
     <div className="relative flex flex-col p-6 rounded-tactus-2xl w-full" style={{ background: allOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)", border: hasError ? `1px solid ${withAlpha("#EF4444", 0.4)}` : "1px solid var(--tactus-border-default)", boxShadow: isAnyOn ? `0 16px 40px 0 ${withAlpha(dominant, 0.07)}` : "none" }}
@@ -96,13 +129,13 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
               <div className="flex gap-[40px] items-center justify-center flex-1">
                 <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPanel("brightness")}>
                   <div className="size-[32px]"><SunIcon stroke="var(--tactus-text-secondary)" size={32} /></div>
-                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{roomBrightness}%</p>
+                  <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{displayBrightness}%</p>
                 </button>
                 {hasColorPanel && (
                   <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPanel("color")}>
-                    <div className="size-[32px] rounded-full" style={{ background: roomColorMode === "temp" && roomColorTempKelvin ? kelvinToHex(roomColorTempKelvin) : roomColor.hex }} />
+                    <div className="size-[32px] rounded-full" style={{ background: roomColorMode === "temp" && displayKelvin ? kelvinToHex(displayKelvin) : roomColor.hex }} />
                     <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>
-                      {roomColorMode === "temp" && roomColorTempKelvin ? `${Math.round(roomColorTempKelvin / 100) * 100}K` : roomColor.label.split(" ")[0]}
+                      {roomColorMode === "temp" && displayKelvin ? `${Math.round(displayKelvin / 100) * 100}K` : roomColor.label.split(" ")[0]}
                     </p>
                   </button>
                 )}
@@ -113,24 +146,24 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
               <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => setPanel("summary")}>
                 <div className="size-[16px]"><SunIcon stroke="var(--tactus-text-secondary)" size={16} /></div>
                 <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
-                  <span style={{ fontSize: 24, fontWeight: 600 }}>{roomBrightness}</span>
+                  <span style={{ fontSize: 24, fontWeight: 600 }}>{displayBrightness}</span>
                   <span style={{ fontSize: 14, fontWeight: 600 }}> %</span>
                 </p>
                 <div className="size-[24px]"><SunIcon stroke={dominant} size={24} /></div>
               </button>
-              <BrightnessSlider value={roomBrightness} onChange={onBrightnessChange} accent={dominant} />
+              <BrightnessSlider value={displayBrightness} onChange={handleBrightnessChange} accent={dominant} />
             </motion.div>
           ) : panel === "color" && roomColorMode === "temp" && roomTempRange ? (
             <motion.div key="temp" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
               <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => setPanel("summary")}>
                 <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(roomTempRange.min) }} />
                 <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
-                  <span style={{ fontSize: 24, fontWeight: 600 }}>{roomColorTempKelvin ?? roomTempRange.min}</span>
+                  <span style={{ fontSize: 24, fontWeight: 600 }}>{displayKelvin ?? roomTempRange.min}</span>
                   <span style={{ fontSize: 14, fontWeight: 600 }}> K</span>
                 </p>
                 <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(roomTempRange.max) }} />
               </button>
-              <ColorTempSlider value={roomColorTempKelvin ?? roomTempRange.min} min={roomTempRange.min} max={roomTempRange.max} onChange={onColorTempChange} />
+              <ColorTempSlider value={displayKelvin ?? roomTempRange.min} min={roomTempRange.min} max={roomTempRange.max} onChange={handleColorTempChange} />
             </motion.div>
           ) : panel === "color" && roomColorMode === "rgb" ? (
             <motion.div key="col" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
