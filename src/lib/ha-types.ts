@@ -115,6 +115,16 @@ function roomNameFromSlug(slug: string): string {
   return slug.split("_").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 }
 
+// Average brightness across a room's (or the whole house's) currently-on
+// lights. Shared so it can be recomputed live from the lights array itself —
+// not just once at initial load — every time any light's confirmed state
+// changes, regardless of what triggered the change (individual toggle, room
+// bulk action, or house bulk action).
+export function computeRoomBrightness(lights: LightState[]): number {
+  const onLights = lights.filter((l) => l.cardState === "on");
+  return onLights.length ? Math.round(onLights.reduce((s, l) => s + l.brightness, 0) / onLights.length) : 0;
+}
+
 // Rooms are derived from DIRIGERA light entity_ids (light.<room>_<device>),
 // since /api/states doesn't expose HA's area registry. Confirmed against the
 // real 19 light.* entities in HA — room prefixes are: bedroom, kitchen,
@@ -134,17 +144,14 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
     roomLights.set(roomSlug, lights);
   }
 
-  return Array.from(roomLights.entries()).map(([slug, lights]) => {
-    const onLights = lights.filter((l) => l.cardState === "on");
-    return {
-      id: slug,
-      name: roomNameFromSlug(slug),
-      lights,
-      switches: [],
-      sensors: [],
-      roomBrightness: onLights.length ? Math.round(onLights.reduce((s, l) => s + l.brightness, 0) / onLights.length) : 0,
-    };
-  });
+  return Array.from(roomLights.entries()).map(([slug, lights]) => ({
+    id: slug,
+    name: roomNameFromSlug(slug),
+    lights,
+    switches: [],
+    sensors: [],
+    roomBrightness: computeRoomBrightness(lights),
+  }));
 }
 
 export function mapHAStatesToSolar(states: HAStateMap): SolarState {

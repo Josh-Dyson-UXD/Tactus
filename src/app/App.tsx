@@ -5,7 +5,7 @@ import { HAClient } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
-  mapHAStatesToTesla, mapHAStatesToOutdoor, mapLightEntity, hexToRgb, HA_ENTITIES,
+  mapHAStatesToTesla, mapHAStatesToOutdoor, mapLightEntity, computeRoomBrightness, hexToRgb, HA_ENTITIES,
   isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
@@ -74,11 +74,11 @@ export default function App() {
         if (pending) { clearTimeout(pending); lightPendingRef.current.delete(entityId); }
 
         const updated = mapLightEntity(entity);
-        setRooms((prev) => prev.map((r) => (
-          r.lights.some((l) => l.id === entityId)
-            ? { ...r, lights: r.lights.map((l) => (l.id === entityId ? updated : l)) }
-            : r
-        )));
+        setRooms((prev) => prev.map((r) => {
+          if (!r.lights.some((l) => l.id === entityId)) return r;
+          const lights = r.lights.map((l) => (l.id === entityId ? updated : l));
+          return { ...r, lights, roomBrightness: computeRoomBrightness(lights) };
+        }));
       } else if (isSolarEntity(entityId)) {
         setSolar(mapHAStatesToSolar(states));
       } else if (isPowerwallEntity(entityId)) {
