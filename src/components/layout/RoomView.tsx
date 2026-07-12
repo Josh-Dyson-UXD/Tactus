@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import type { Room, LightState, SwitchState, Color } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { ChevronLeft } from "@/components/icons";
@@ -6,6 +7,8 @@ import { SectionHeading } from "@/components/layout/SectionHeading";
 import { LightCard } from "@/components/cards/LightCard";
 import { SwitchCard } from "@/components/cards/SwitchCard";
 import { SensorCard } from "@/components/cards/SensorCard";
+
+const COMMIT_DELAY = 400;
 
 export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor, onLightColorTemp }: {
   room: Room; onBack: () => void; onUpdateRoom: (p: Partial<Room>) => void;
@@ -21,10 +24,29 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
   const updateLight  = (id: string, p: Partial<LightState>)  => onUpdateRoom({ lights:   lights.map((l) => l.id === id ? { ...l, ...p } : l) });
   const updateSwitch = (id: string, p: Partial<SwitchState>) => onUpdateRoom({ switches: switches.map((s) => s.id === id ? { ...s, ...p } : s) });
 
-  const allOn  = () => onUpdateRoom({ lights: lights.map((l) => l.cardState === "error" ? l : { ...l, cardState: "on",  panel: "summary" }), switches: switches.map((s) => ({ ...s, isOn: true,  wattsNow: s.wattsNow || 45 })) });
-  const allOff = () => onUpdateRoom({ lights: lights.map((l) => l.cardState === "error" ? l : { ...l, cardState: "off", panel: "summary" }), switches: switches.map((s) => ({ ...s, isOn: false, wattsNow: 0 })) });
+  // This header's "All On/Off" and brightness bar previously only mutated
+  // local state via onUpdateRoom, same gap as RoomCard/HouseView had — never
+  // called real HA services. Fixed to reuse the real per-light
+  // onLightToggle/onLightBrightness props already used by the LightCards on
+  // this same page. Switches aren't touched (no real switch entities exist).
+  const allOn  = () => lights.forEach((l) => { if (l.cardState !== "error") onLightToggle(l.id, true); });
+  const allOff = () => lights.forEach((l) => { if (l.cardState !== "error") onLightToggle(l.id, false); });
 
-  const handleRoomBrightness = (v: number) => onUpdateRoom({ roomBrightness: v, lights: lights.map((l) => l.cardState !== "on" ? l : { ...l, brightness: v }) });
+  // Same local-state + 400ms debounce pattern as RoomCard/HouseView — without
+  // it, dragging this slider would flood every light in the room with a
+  // service call per pixel.
+  const [localBrightness, setLocalBrightness] = useState<number | null>(null);
+  const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (brightnessTimer.current) clearTimeout(brightnessTimer.current); }, []);
+  const displayBrightness = localBrightness ?? roomBrightness;
+  const handleRoomBrightness = (v: number) => {
+    setLocalBrightness(v);
+    if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
+    brightnessTimer.current = setTimeout(() => {
+      lights.forEach((l) => { if (l.cardState === "on") onLightBrightness(l.id, v); });
+      setLocalBrightness(null);
+    }, COMMIT_DELAY);
+  };
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
@@ -48,7 +70,7 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
             <button onClick={allOn} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: withAlpha("#FFF9E5", 0.1), border: `1px solid ${withAlpha("#FFF9E5", 0.2)}`, fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-warm-white)", fontSize: 13, fontWeight: 600 }}>All On</button>
           </div>
         </div>
-        {lights.length > 0 && <RoomControls roomBrightness={roomBrightness} onBrightnessChange={handleRoomBrightness} />}
+        {lights.length > 0 && <RoomControls roomBrightness={displayBrightness} onBrightnessChange={handleRoomBrightness} />}
       </div>
 
       <div className="p-8 flex flex-col gap-10">
