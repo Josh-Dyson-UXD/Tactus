@@ -170,13 +170,14 @@ export function mapHAStatesToSolar(states: HAStateMap): SolarState {
 
 export function mapHAStatesToPowerwall(states: HAStateMap): PowerwallState {
   const pct = round(num(states, HA_ENTITIES.powerwallCharge), 0);
-  // sensor.home_battery_power is already in kW — confirm the sign convention
-  // against your actual Powerwall install (positive vs negative for
-  // charge/discharge) before trusting the "charging"/"discharging" label below.
+  // sensor.home_battery_power is already in kW. Confirmed against the real
+  // Powerwall (2026-07-12): negative = charging (power flowing into the
+  // battery), positive = discharging (power flowing out) — the opposite of
+  // the initial assumption.
   const flowKw = round(num(states, HA_ENTITIES.powerwallFlow), 1);
   const reservePct = num(states, HA_ENTITIES.powerwallReserve);
   const status: PowerwallState["status"] =
-    flowKw > 0.05 ? "charging" : flowKw < -0.05 ? "discharging" : pct <= reservePct ? "backup" : "standby";
+    flowKw < -0.05 ? "charging" : flowKw > 0.05 ? "discharging" : pct <= reservePct ? "backup" : "standby";
   return { pct, flowKw: round(Math.abs(flowKw), 1), reservePct, status };
 }
 
