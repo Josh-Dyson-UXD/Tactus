@@ -57,11 +57,57 @@ export type GridState = { importKw: number; exportKw: number };
 
 export type OutdoorState = { tempC: number; humidity: number; aqi: number; pm25: number; condition: string };
 
+// sensor.home_load_power — instantaneous whole-home draw, kW.
+export type HomeLoadState = { loadKw: number };
+
+export type SeatHeaterLevel      = "off" | "low" | "medium" | "high";
+export type SteeringHeaterLevel  = "off" | "low" | "high";
+export type ClimatePreset        = "off" | "keep" | "dog" | "camp";
+export type ClimateFanMode       = "off" | "bioweapon";
+
+// Shared pending → confirmed status for any HA-backed toggle/select/cover
+// control that isn't part of the core device state itself (mirrors CardState
+// "pending"/"error" but for controls that don't have their own card).
+export type ControlStatus = "idle" | "pending" | "error";
+
+export type TeslaControlKey =
+  | "lock" | "climate" | "sentry" | "valet"
+  | "seatHeaterFL" | "seatHeaterFR" | "steeringWheelHeater"
+  | "climatePreset" | "climateFanMode"
+  | "frunk" | "trunk" | "windows";
+
+export type TeslaActions = {
+  toggleClimate: () => void;
+  toggleLock: () => void;
+  toggleSentry: () => void;
+  toggleValet: () => void;
+  setSeatHeaterFL: (level: SeatHeaterLevel) => void;
+  setSeatHeaterFR: (level: SeatHeaterLevel) => void;
+  setSteeringWheelHeater: (level: SteeringHeaterLevel) => void;
+  setClimatePreset: (preset: ClimatePreset) => void;
+  setClimateFanMode: (mode: ClimateFanMode) => void;
+  openFrunk: () => void;
+  toggleTrunk: () => void;
+  toggleWindows: () => void;
+  honk: () => void;
+  flash: () => void;
+};
+
 export type TeslaState = {
   model: string; batteryPct: number; rangeKm: number;
   status: "parked" | "charging" | "away";
   chargingKw?: number; tempC: number; climateOn: boolean; locked: boolean;
   location?: string;
+  sentryMode: boolean;
+  valetMode: boolean;
+  seatHeaterFL: SeatHeaterLevel;
+  seatHeaterFR: SeatHeaterLevel;
+  steeringWheelHeater: SteeringHeaterLevel;
+  climatePreset: ClimatePreset;
+  climateFanMode: ClimateFanMode;
+  frunkOpen: boolean;
+  trunkOpen: boolean;
+  windowsOpen: boolean;
 };
 
 // ─── Room ─────────────────────────────────────────────────────────────────────

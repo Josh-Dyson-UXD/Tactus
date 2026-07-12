@@ -1,12 +1,16 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, Color } from "@/types";
+import type {
+  Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, Color,
+  ControlStatus, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
+} from "@/types";
 import { HAClient } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
-  mapHAStatesToTesla, mapHAStatesToOutdoor, mapLightEntity, computeRoomBrightness, hexToRgb, HA_ENTITIES,
-  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity,
+  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapLightEntity, computeRoomBrightness, hexToRgb,
+  HA_ENTITIES, TESLA_CONTROL_ENTITY,
+  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
@@ -21,7 +25,11 @@ const HA_TOKEN = import.meta.env.VITE_HA_TOKEN as string | undefined;
 // "Control" — pending must hold for the *confirmed* value, never assumed.
 const PENDING_TIMEOUT_MS = 7000;
 
-type ControlStatus = "idle" | "pending" | "error";
+const TESLA_CONTROL_KEYS: TeslaControlKey[] = [
+  "lock", "climate", "sentry", "valet", "seatHeaterFL", "seatHeaterFR",
+  "steeringWheelHeater", "climatePreset", "climateFanMode", "frunk", "trunk", "windows",
+];
+const IDLE_TESLA_CONTROL = Object.fromEntries(TESLA_CONTROL_KEYS.map((k) => [k, "idle" as ControlStatus])) as Record<TeslaControlKey, ControlStatus>;
 
 export default function App() {
   const [rooms, setRooms]           = useState<Room[]>([]);
@@ -30,9 +38,10 @@ export default function App() {
   const [grid, setGrid]             = useState<GridState | null>(null);
   const [tesla, setTesla]           = useState<TeslaState | null>(null);
   const [outdoor, setOutdoor]       = useState<OutdoorState | null>(null);
+  const [homeLoad, setHomeLoad]     = useState<HomeLoadState | null>(null);
   const [connError, setConnError]  = useState<string | null>(null);
   const [selectedRoomId, setRoomId] = useState<string | null>(null);
-  const [teslaControl, setTeslaControl] = useState<{ climate: ControlStatus; lock: ControlStatus }>({ climate: "idle", lock: "idle" });
+  const [teslaControl, setTeslaControl] = useState<Record<TeslaControlKey, ControlStatus>>(IDLE_TESLA_CONTROL);
 
   // Full snapshot kept locally so aggregate cards (solar/powerwall/grid/
   // tesla/outdoor, each backed by several entities) can be recomputed from
@@ -40,7 +49,7 @@ export default function App() {
   const statesRef = useRef<HAStateMap>({});
   const clientRef = useRef<HAClient | null>(null);
   const lightPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const teslaPendingRef = useRef<Map<"climate" | "lock", ReturnType<typeof setTimeout>>>(new Map());
+  const teslaPendingRef = useRef<Map<TeslaControlKey, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     if (!HA_URL || !HA_TOKEN) {
@@ -60,6 +69,7 @@ export default function App() {
         setGrid(mapHAStatesToGrid(states));
         setTesla(mapHAStatesToTesla(states));
         setOutdoor(mapHAStatesToOutdoor(states));
+        setHomeLoad(mapHAStatesToHomeLoad(states));
       })
       .catch((err) => setConnError(err instanceof Error ? err.message : String(err)));
 
@@ -86,17 +96,25 @@ export default function App() {
       } else if (isGridEntity(entityId)) {
         setGrid(mapHAStatesToGrid(states));
       } else if (isTeslaEntity(entityId)) {
+        const clearTeslaPending = (key: TeslaControlKey) => {
+          const pending = teslaPendingRef.current.get(key);
+          if (pending) { clearTimeout(pending); teslaPendingRef.current.delete(key); setTeslaControl((s) => ({ ...s, [key]: "idle" })); }
+        };
         if (entityId === HA_ENTITIES.teslaClimate) {
-          const pending = teslaPendingRef.current.get("climate");
-          if (pending) { clearTimeout(pending); teslaPendingRef.current.delete("climate"); setTeslaControl((s) => ({ ...s, climate: "idle" })); }
-        }
-        if (entityId === HA_ENTITIES.teslaLock) {
-          const pending = teslaPendingRef.current.get("lock");
-          if (pending) { clearTimeout(pending); teslaPendingRef.current.delete("lock"); setTeslaControl((s) => ({ ...s, lock: "idle" })); }
+          // climate.ghost_climate backs three keys (on/off, preset, fan mode)
+          // — clear whichever of them is actually in flight.
+          clearTeslaPending("climate");
+          clearTeslaPending("climatePreset");
+          clearTeslaPending("climateFanMode");
+        } else {
+          const key = TESLA_CONTROL_ENTITY[entityId];
+          if (key) clearTeslaPending(key);
         }
         setTesla(mapHAStatesToTesla(states));
       } else if (isOutdoorEntity(entityId)) {
         setOutdoor(mapHAStatesToOutdoor(states));
+      } else if (isHomeLoadEntity(entityId)) {
+        setHomeLoad(mapHAStatesToHomeLoad(states));
       }
     });
 
@@ -179,7 +197,10 @@ export default function App() {
   }, [rooms, handleLightBrightness]);
 
   // ─── Tesla control: pending → confirmed cycle ────────────────────────────
-  const controlTesla = useCallback((key: "climate" | "lock", domain: string, service: string, entityId: string) => {
+  // Generalized across every toggle/select/cover control on the card — same
+  // mechanics as controlLight/controlTesla's original climate+lock pair, just
+  // keyed by TeslaControlKey instead of hardcoded to two fields.
+  const controlTesla = useCallback((key: TeslaControlKey, domain: string, service: string, entityId: string, serviceData: Record<string, unknown> = {}) => {
     const client = clientRef.current;
     if (!client) return;
 
@@ -187,7 +208,7 @@ export default function App() {
     if (existing) clearTimeout(existing);
 
     setTeslaControl((s) => ({ ...s, [key]: "pending" }));
-    client.callService(domain, service, {}, { entity_id: entityId });
+    client.callService(domain, service, serviceData, { entity_id: entityId });
 
     const timeout = setTimeout(() => {
       teslaPendingRef.current.delete(key);
@@ -204,6 +225,57 @@ export default function App() {
     controlTesla("lock", "lock", tesla?.locked ? "unlock" : "lock", HA_ENTITIES.teslaLock);
   }, [controlTesla, tesla?.locked]);
 
+  const handleToggleTeslaSentry = useCallback(() => {
+    controlTesla("sentry", "switch", tesla?.sentryMode ? "turn_off" : "turn_on", HA_ENTITIES.teslaSentry);
+  }, [controlTesla, tesla?.sentryMode]);
+
+  const handleToggleTeslaValet = useCallback(() => {
+    controlTesla("valet", "switch", tesla?.valetMode ? "turn_off" : "turn_on", HA_ENTITIES.teslaValet);
+  }, [controlTesla, tesla?.valetMode]);
+
+  const handleTeslaSeatHeaterFL = useCallback((level: SeatHeaterLevel) => {
+    controlTesla("seatHeaterFL", "select", "select_option", HA_ENTITIES.teslaSeatHeaterFL, { option: level });
+  }, [controlTesla]);
+
+  const handleTeslaSeatHeaterFR = useCallback((level: SeatHeaterLevel) => {
+    controlTesla("seatHeaterFR", "select", "select_option", HA_ENTITIES.teslaSeatHeaterFR, { option: level });
+  }, [controlTesla]);
+
+  const handleTeslaSteeringWheelHeater = useCallback((level: SteeringHeaterLevel) => {
+    controlTesla("steeringWheelHeater", "select", "select_option", HA_ENTITIES.teslaSteeringWheelHeater, { option: level });
+  }, [controlTesla]);
+
+  const handleTeslaClimatePreset = useCallback((preset: ClimatePreset) => {
+    controlTesla("climatePreset", "climate", "set_preset_mode", HA_ENTITIES.teslaClimate, { preset_mode: preset });
+  }, [controlTesla]);
+
+  const handleTeslaClimateFanMode = useCallback((mode: ClimateFanMode) => {
+    controlTesla("climateFanMode", "climate", "set_fan_mode", HA_ENTITIES.teslaClimate, { fan_mode: mode });
+  }, [controlTesla]);
+
+  // cover.ghost_frunk supports open_cover only (supported_features: 1) — no
+  // close service exists for it, so this is a one-shot action, not a toggle.
+  const handleTeslaOpenFrunk = useCallback(() => {
+    controlTesla("frunk", "cover", "open_cover", HA_ENTITIES.teslaFrunk);
+  }, [controlTesla]);
+
+  const handleToggleTeslaTrunk = useCallback(() => {
+    controlTesla("trunk", "cover", tesla?.trunkOpen ? "close_cover" : "open_cover", HA_ENTITIES.teslaTrunk);
+  }, [controlTesla, tesla?.trunkOpen]);
+
+  const handleToggleTeslaWindows = useCallback(() => {
+    controlTesla("windows", "cover", tesla?.windowsOpen ? "close_cover" : "open_cover", HA_ENTITIES.teslaWindows);
+  }, [controlTesla, tesla?.windowsOpen]);
+
+  // Fire-and-forget — no persisted state to confirm, so no pending/error cycle.
+  const handleTeslaHonk = useCallback(() => {
+    clientRef.current?.callService("button", "press", {}, { entity_id: HA_ENTITIES.teslaHonk });
+  }, []);
+
+  const handleTeslaFlash = useCallback(() => {
+    clientRef.current?.callService("button", "press", {}, { entity_id: HA_ENTITIES.teslaFlash });
+  }, []);
+
   const updateRoom  = useCallback((id: string, p: Partial<Room>) => setRooms((prev) => prev.map((r) => r.id === id ? { ...r, ...p } : r)), []);
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId) ?? null;
 
@@ -215,7 +287,7 @@ export default function App() {
     );
   }
 
-  if (!solar || !powerwall || !grid || !tesla || !outdoor) {
+  if (!solar || !powerwall || !grid || !tesla || !outdoor || !homeLoad) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--tactus-bg-base)" }}>
         <p className="text-[14px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Connecting to Home Assistant…</p>
@@ -232,9 +304,18 @@ export default function App() {
         </motion.div>
       ) : (
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
-          <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor}
+          <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor} homeLoad={homeLoad}
             onNavigate={setRoomId}
-            teslaControl={teslaControl} onToggleTeslaClimate={handleToggleTeslaClimate} onToggleTeslaLock={handleToggleTeslaLock}
+            teslaControl={teslaControl}
+            teslaActions={{
+              toggleClimate: handleToggleTeslaClimate, toggleLock: handleToggleTeslaLock,
+              toggleSentry: handleToggleTeslaSentry, toggleValet: handleToggleTeslaValet,
+              setSeatHeaterFL: handleTeslaSeatHeaterFL, setSeatHeaterFR: handleTeslaSeatHeaterFR,
+              setSteeringWheelHeater: handleTeslaSteeringWheelHeater,
+              setClimatePreset: handleTeslaClimatePreset, setClimateFanMode: handleTeslaClimateFanMode,
+              openFrunk: handleTeslaOpenFrunk, toggleTrunk: handleToggleTeslaTrunk, toggleWindows: handleToggleTeslaWindows,
+              honk: handleTeslaHonk, flash: handleTeslaFlash,
+            }}
             onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness}
             onHouseToggle={handleHouseToggle} onHouseBrightness={handleHouseBrightness} />
         </motion.div>

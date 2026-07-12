@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState } from "@/types";
+import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, ControlStatus, TeslaControlKey, TeslaActions } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { computeRoomBrightness } from "@/lib/ha-types";
 import { RoomControls } from "@/components/controls/RoomControls";
@@ -8,18 +8,16 @@ import { SectionHeading } from "@/components/layout/SectionHeading";
 import { SolarCard } from "@/components/cards/SolarCard";
 import { PowerwallCard } from "@/components/cards/PowerwallCard";
 import { TeslaCard } from "@/components/cards/TeslaCard";
+import { EnergyFlowCard } from "@/components/cards/EnergyFlowCard";
 import { RoomCard } from "@/components/cards/RoomCard";
-
-type ControlStatus = "idle" | "pending" | "error";
 
 const COMMIT_DELAY = 400;
 
-export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNavigate, teslaControl, onToggleTeslaClimate, onToggleTeslaLock, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
-  rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState;
+export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeLoad, onNavigate, teslaControl, teslaActions, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
+  rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState; homeLoad: HomeLoadState;
   onNavigate: (id: string) => void;
-  teslaControl: { climate: ControlStatus; lock: ControlStatus };
-  onToggleTeslaClimate: () => void;
-  onToggleTeslaLock: () => void;
+  teslaControl: Record<TeslaControlKey, ControlStatus>;
+  teslaActions: TeslaActions;
   onRoomToggle: (room: Room, on: boolean) => void;
   onRoomBrightness: (room: Room, v: number) => void;
   onHouseToggle: (on: boolean) => void;
@@ -72,7 +70,10 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
             <SolarCard solar={solar} />
             <PowerwallCard powerwall={powerwall} grid={grid} />
-            <TeslaCard tesla={tesla} climateControl={teslaControl.climate} lockControl={teslaControl.lock} onToggleClimate={onToggleTeslaClimate} onToggleLock={onToggleTeslaLock} />
+            <TeslaCard tesla={tesla} control={teslaControl} actions={teslaActions} />
+          </div>
+          <div className="mt-4">
+            <EnergyFlowCard solar={solar} powerwall={powerwall} grid={grid} homeLoad={homeLoad} tesla={tesla} />
           </div>
         </div>
 
