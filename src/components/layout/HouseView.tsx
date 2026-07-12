@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState } from "@/types";
 import { withAlpha } from "@/lib/helpers";
+import { computeRoomBrightness } from "@/lib/ha-types";
 import { RoomControls } from "@/components/controls/RoomControls";
 import { EnvironmentBar } from "@/components/layout/EnvironmentBar";
 import { SectionHeading } from "@/components/layout/SectionHeading";
@@ -24,23 +25,27 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
   onHouseToggle: (on: boolean) => void;
   onHouseBrightness: (v: number) => void;
 }) {
-  const [houseBrightness, setHouseBrightness] = useState(75);
-
-  // Same local-state + debounce pattern as LightCard/RoomCard — this fans
-  // out to every light in every room (potentially 15+ at once), so it's
-  // even more flood-prone than the room-level case. Dragging updates the
-  // slider instantly; onHouseBrightness (the real per-light service calls)
-  // only fires once, 400ms after the last movement.
+  // Idle display is the true live average across every room's on lights —
+  // recomputed on every render from the real rooms prop, not a stale local
+  // default. Same local-state + debounce pattern as LightCard/RoomCard: a
+  // local override takes over only during an active drag/settle window,
+  // then clears so the slider goes back to tracking the real average. This
+  // fans out to every light in every room (potentially 15+ at once), so
+  // it's even more flood-prone than the room-level case.
+  const [localHouseBrightness, setLocalHouseBrightness] = useState<number | null>(null);
   const houseBrightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (houseBrightnessTimer.current) clearTimeout(houseBrightnessTimer.current); }, []);
 
   const totalActive = rooms.reduce((s, r) => s + r.lights.filter(l => l.cardState === "on").length + r.switches.filter(s => s.isOn).length, 0);
   const totalDevices = rooms.reduce((s, r) => s + r.lights.length + r.switches.length, 0);
 
+  const liveHouseBrightness = computeRoomBrightness(rooms.flatMap((r) => r.lights));
+  const displayHouseBrightness = localHouseBrightness ?? liveHouseBrightness;
+
   const handleHouseBrightnessChange = (v: number) => {
-    setHouseBrightness(v);
+    setLocalHouseBrightness(v);
     if (houseBrightnessTimer.current) clearTimeout(houseBrightnessTimer.current);
-    houseBrightnessTimer.current = setTimeout(() => onHouseBrightness(v), COMMIT_DELAY);
+    houseBrightnessTimer.current = setTimeout(() => { onHouseBrightness(v); setLocalHouseBrightness(null); }, COMMIT_DELAY);
   };
 
   return (
@@ -56,7 +61,7 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, onNav
             <button onClick={() => onHouseToggle(true)} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: withAlpha("#FFF9E5", 0.1), border: `1px solid ${withAlpha("#FFF9E5", 0.2)}`, fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-warm-white)", fontSize: 13, fontWeight: 600 }}>All On</button>
           </div>
         </div>
-        <RoomControls roomBrightness={houseBrightness} onBrightnessChange={handleHouseBrightnessChange} label="All Lights" />
+        <RoomControls roomBrightness={displayHouseBrightness} onBrightnessChange={handleHouseBrightnessChange} label="All Lights" />
       </div>
 
       <div className="p-8 flex flex-col gap-10">
