@@ -1,40 +1,36 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { COLORS } from "@/types";
-import type { Room, Color } from "@/types";
-import { withAlpha, dominantColor, kelvinToHex } from "@/lib/helpers";
+import type { Room } from "@/types";
+import { withAlpha, dominantColor } from "@/lib/helpers";
 import { SunIcon } from "@/components/icons";
 import { BrightnessSlider } from "@/components/controls/BrightnessSlider";
-import { ColorTempSlider } from "@/components/controls/ColorTempSlider";
 
-type Panel = "summary" | "brightness" | "color";
+type Panel = "summary" | "brightness";
 
 const COMMIT_DELAY = 400;
 
-export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, onColorChange, onColorTempChange }: {
+// Brightness + on/off only — colour selection only ever exists at the
+// individual LightCard level. Different bulbs in a room can support
+// different colour modes (or none at all), so a single "room colour" was
+// never physically accurate. The small per-light dots below are still
+// each light's real current colour — status indicators, not a control.
+export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange }: {
   room: Room; onNavigate: () => void; onToggleAll: (on: boolean) => void;
   onBrightnessChange: (v: number) => void;
-  onColorChange: (c: Color) => void;
-  onColorTempChange: (kelvin: number) => void;
 }) {
-  const { name, lights, switches, sensors, roomBrightness, roomColor } = room;
+  const { name, lights, switches, sensors, roomBrightness } = room;
   const [panel, setPanel] = useState<Panel>("summary");
 
   // Local optimistic value + debounce — dragging updates the numeral/thumb
-  // instantly and smoothly, but onBrightnessChange/onColorTempChange (which
-  // fan out to a real light.turn_on per light in the room) only fire once,
-  // 400ms after the last movement. Same pattern as LightCard's
-  // handleBrightnessChange/handleColorTempChange — without it, one drag
-  // floods the Zigbee mesh with a service call per pixel across every light
-  // in the room, and they miss the pending-confirm window and land in error.
+  // instantly and smoothly, but onBrightnessChange (which fans out to a real
+  // light.turn_on per light in the room) only fires once, 400ms after the
+  // last movement. Same pattern as LightCard's handleBrightnessChange —
+  // without it, one drag floods the Zigbee mesh with a service call per
+  // pixel across every light in the room, and they miss the pending-confirm
+  // window and land in error.
   const [localBrightness, setLocalBrightness] = useState<number | null>(null);
-  const [localKelvin, setLocalKelvin] = useState<number | null>(null);
   const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const colorTempTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
-    if (colorTempTimer.current) clearTimeout(colorTempTimer.current);
-  }, []);
+  useEffect(() => () => { if (brightnessTimer.current) clearTimeout(brightnessTimer.current); }, []);
 
   const activeLights   = lights.filter((l) => l.cardState === "on").length;
   const activeSwitches = switches.filter((s) => s.isOn).length;
@@ -45,24 +41,7 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
   const tempSensor     = sensors.find((s) => s.data.kind === "temp");
   const motionSensor   = sensors.find((s) => s.data.kind === "motion");
 
-  // Room-level colour capability, derived from the room's actual lights —
-  // not assumed. Majority vote across colour-capable lights decides which
-  // picker the room shows; rooms with no colour-capable lights get no
-  // colour control at all. See CLAUDE.md and LightCard's own colorMode gating.
-  const colorCapable = lights.filter((l) => l.colorMode !== "brightness");
-  const rgbCount  = colorCapable.filter((l) => l.colorMode === "rgb").length;
-  const tempLights = colorCapable.filter((l) => l.colorMode === "temp");
-  const roomColorMode: "rgb" | "temp" | null =
-    colorCapable.length === 0 ? null : rgbCount >= tempLights.length ? "rgb" : "temp";
-  const roomTempRange = tempLights.find((l) => l.colorTempRange)?.colorTempRange;
-  const onTempLights = tempLights.filter((l) => (l.cardState === "on" || l.cardState === "pending") && l.colorTempKelvin !== undefined);
-  const roomColorTempKelvin = onTempLights.length
-    ? Math.round(onTempLights.reduce((s, l) => s + (l.colorTempKelvin ?? 0), 0) / onTempLights.length)
-    : roomTempRange ? Math.round((roomTempRange.min + roomTempRange.max) / 2) : undefined;
-  const hasColorPanel = roomColorMode === "rgb" || (roomColorMode === "temp" && roomTempRange !== undefined);
-
   const displayBrightness = localBrightness ?? roomBrightness;
-  const displayKelvin = localKelvin ?? roomColorTempKelvin;
 
   const handleBrightnessChange = (v: number) => {
     setLocalBrightness(v);
@@ -73,12 +52,6 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
     // never reflect subsequent real changes (individual lights, physical
     // switches, etc.).
     brightnessTimer.current = setTimeout(() => { onBrightnessChange(v); setLocalBrightness(null); }, COMMIT_DELAY);
-  };
-
-  const handleColorTempChange = (kelvin: number) => {
-    setLocalKelvin(kelvin);
-    if (colorTempTimer.current) clearTimeout(colorTempTimer.current);
-    colorTempTimer.current = setTimeout(() => { onColorTempChange(kelvin); setLocalKelvin(null); }, COMMIT_DELAY);
   };
 
   return (
@@ -107,7 +80,7 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
         </div>
       </button>
 
-      {/* Light dots */}
+      {/* Light dots — status indicators of each light's real current colour, not a control */}
       <div className="flex items-center gap-2 flex-wrap mb-4">
         {lights.map((l) => {
           const on = l.cardState === "on", err = l.cardState === "error", pending = l.cardState === "pending";
@@ -119,14 +92,13 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
         ))}
       </div>
 
-      {/* Bottom panel — mirrors LightCard's summary → brightness/color state machine */}
+      {/* Bottom panel — mirrors LightCard's brightness-only summary (colorMode === "brightness") */}
       <div className="w-full shrink-0" style={{ height: 100 }} onClick={(e) => e.stopPropagation()}>
         <AnimatePresence mode="wait">
           {!isAnyOn ? (
             <motion.div key="off" className="flex items-start justify-center w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
               <div className="flex gap-[40px] items-center justify-center flex-1">
                 <div className="size-[32px]"><SunIcon stroke="var(--tactus-border-default)" size={32} /></div>
-                {hasColorPanel && <div className="size-[32px] rounded-full" style={{ background: "var(--tactus-border-default)" }} />}
               </div>
             </motion.div>
           ) : panel === "summary" ? (
@@ -136,17 +108,9 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
                   <div className="size-[32px]"><SunIcon stroke="var(--tactus-text-secondary)" size={32} /></div>
                   <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{displayBrightness}%</p>
                 </button>
-                {hasColorPanel && (
-                  <button className="flex flex-col items-center gap-[6px] w-[72px] cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPanel("color")}>
-                    <div className="size-[32px] rounded-full" style={{ background: roomColorMode === "temp" && displayKelvin ? kelvinToHex(displayKelvin) : roomColor.hex }} />
-                    <p className="text-[13px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>
-                      {roomColorMode === "temp" && displayKelvin ? `${Math.round(displayKelvin / 100) * 100}K` : roomColor.label.split(" ")[0]}
-                    </p>
-                  </button>
-                )}
               </div>
             </motion.div>
-          ) : panel === "brightness" ? (
+          ) : (
             <motion.div key="br" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
               <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => setPanel("summary")}>
                 <div className="size-[16px]"><SunIcon stroke="var(--tactus-text-secondary)" size={16} /></div>
@@ -158,33 +122,7 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange, on
               </button>
               <BrightnessSlider value={displayBrightness} onChange={handleBrightnessChange} accent={dominant} />
             </motion.div>
-          ) : panel === "color" && roomColorMode === "temp" && roomTempRange ? (
-            <motion.div key="temp" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-              <button className="flex items-center justify-between w-full cursor-pointer hover:opacity-75 transition-opacity" onClick={() => setPanel("summary")}>
-                <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(roomTempRange.min) }} />
-                <p style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-primary)" }}>
-                  <span style={{ fontSize: 24, fontWeight: 600 }}>{displayKelvin ?? roomTempRange.min}</span>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}> K</span>
-                </p>
-                <div className="size-[16px] rounded-full" style={{ background: kelvinToHex(roomTempRange.max) }} />
-              </button>
-              <ColorTempSlider value={displayKelvin ?? roomTempRange.min} min={roomTempRange.min} max={roomTempRange.max} onChange={handleColorTempChange} />
-            </motion.div>
-          ) : panel === "color" && roomColorMode === "rgb" ? (
-            <motion.div key="col" className="flex flex-col gap-[12px] w-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-              <div className="flex gap-[12px] items-center w-full">
-                {COLORS.map((c) => (
-                  <button key={c.id} className="relative shrink-0 size-[36px] rounded-full cursor-pointer" onClick={() => onColorChange(c as Color)}>
-                    <svg viewBox="0 0 36 36" fill="none" className="size-full">
-                      {c.id === roomColor.id && <rect x="1" y="1" width="34" height="34" rx="17" stroke={c.hex} strokeWidth="2" />}
-                      <circle cx="18" cy="18" r="14" fill={c.hex} />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[13px] font-normal leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-primary)" }}>{roomColor.label}</p>
-            </motion.div>
-          ) : null}
+          )}
         </AnimatePresence>
       </div>
 

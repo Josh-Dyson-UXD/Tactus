@@ -69,5 +69,5 @@ export type TeslaState = {
 export type Room = {
   id: string; name: string;
   lights: LightState[]; switches: SwitchState[]; sensors: SensorState[];
-  roomBrightness: number; roomColor: Color;
+  roomBrightness: number;
 };

@@ -14,7 +14,7 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
   onLightColor: (entityId: string, c: Color) => void;
   onLightColorTemp: (entityId: string, kelvin: number) => void;
 }) {
-  const { lights, switches, sensors, roomBrightness, roomColor, name } = room;
+  const { lights, switches, sensors, roomBrightness, name } = room;
   const activeCount = lights.filter(l => l.cardState === "on").length + switches.filter(s => s.isOn).length;
   const totalCount  = lights.length + switches.length;
 
@@ -25,7 +25,6 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
   const allOff = () => onUpdateRoom({ lights: lights.map((l) => l.cardState === "error" ? l : { ...l, cardState: "off", panel: "summary" }), switches: switches.map((s) => ({ ...s, isOn: false, wattsNow: 0 })) });
 
   const handleRoomBrightness = (v: number) => onUpdateRoom({ roomBrightness: v, lights: lights.map((l) => l.cardState !== "on" ? l : { ...l, brightness: v }) });
-  const handleRoomColor = (c: typeof roomColor) => onUpdateRoom({ roomColor: c, lights: lights.map((l) => l.cardState !== "on" ? l : { ...l, selectedColor: c }) });
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
@@ -49,7 +48,7 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
             <button onClick={allOn} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: withAlpha("#FFF9E5", 0.1), border: `1px solid ${withAlpha("#FFF9E5", 0.2)}`, fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-warm-white)", fontSize: 13, fontWeight: 600 }}>All On</button>
           </div>
         </div>
-        {lights.length > 0 && <RoomControls roomBrightness={roomBrightness} roomColor={roomColor} onBrightnessChange={handleRoomBrightness} onColorChange={handleRoomColor} />}
+        {lights.length > 0 && <RoomControls roomBrightness={roomBrightness} onBrightnessChange={handleRoomBrightness} />}
       </div>
 
       <div className="p-8 flex flex-col gap-10">
