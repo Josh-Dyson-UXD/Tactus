@@ -143,7 +143,6 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
       switches: [],
       sensors: [],
       roomBrightness: onLights.length ? Math.round(onLights.reduce((s, l) => s + l.brightness, 0) / onLights.length) : 0,
-      roomColor: onLights[0]?.selectedColor ?? COLORS[0],
     };
   });
 }

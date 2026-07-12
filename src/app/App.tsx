@@ -153,18 +153,6 @@ export default function App() {
     controlLight(entityId, "turn_on", { color_temp_kelvin: kelvin });
   }, [controlLight]);
 
-  // Room-level colour bulk-apply: only send the service call to lights that
-  // actually support the mode being applied (RoomCard already gates which
-  // picker is shown by majority colorMode, but a room can still mix
-  // capabilities) — silently skip the rest, no error surfaced for them.
-  const handleRoomColor = useCallback((room: Room, color: Color) => {
-    room.lights.forEach((l) => { if (l.colorMode === "rgb" && l.cardState === "on") handleLightColor(l.id, color); });
-  }, [handleLightColor]);
-
-  const handleRoomColorTemp = useCallback((room: Room, kelvin: number) => {
-    room.lights.forEach((l) => { if (l.colorMode === "temp" && l.cardState === "on") handleLightColorTemp(l.id, kelvin); });
-  }, [handleLightColorTemp]);
-
   // Room-level bulk toggle/brightness: no separate room-level pending state —
   // each affected light fires its own independent controlLight() call and
   // rides the same per-light pending → confirmed cycle from step 4. The
@@ -177,6 +165,18 @@ export default function App() {
   const handleRoomBrightness = useCallback((room: Room, brightnessPct: number) => {
     room.lights.forEach((l) => { if (l.cardState === "on") handleLightBrightness(l.id, brightnessPct); });
   }, [handleLightBrightness]);
+
+  // Whole-house bulk toggle/brightness: same fan-out, just across every
+  // room's lights instead of one room's. The brightness slider debounces in
+  // HouseView before this ever fires, since this is even more flood-prone
+  // (potentially 15+ lights at once) than the room-level case.
+  const handleHouseToggle = useCallback((on: boolean) => {
+    rooms.forEach((room) => room.lights.forEach((l) => { if (l.cardState !== "error") handleLightToggle(l.id, on); }));
+  }, [rooms, handleLightToggle]);
+
+  const handleHouseBrightness = useCallback((brightnessPct: number) => {
+    rooms.forEach((room) => room.lights.forEach((l) => { if (l.cardState === "on") handleLightBrightness(l.id, brightnessPct); }));
+  }, [rooms, handleLightBrightness]);
 
   // ─── Tesla control: pending → confirmed cycle ────────────────────────────
   const controlTesla = useCallback((key: "climate" | "lock", domain: string, service: string, entityId: string) => {
@@ -233,10 +233,10 @@ export default function App() {
       ) : (
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
           <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor}
-            onNavigate={setRoomId} onUpdateRoom={updateRoom}
+            onNavigate={setRoomId}
             teslaControl={teslaControl} onToggleTeslaClimate={handleToggleTeslaClimate} onToggleTeslaLock={handleToggleTeslaLock}
-            onRoomColor={handleRoomColor} onRoomColorTemp={handleRoomColorTemp}
-            onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness} />
+            onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness}
+            onHouseToggle={handleHouseToggle} onHouseBrightness={handleHouseBrightness} />
         </motion.div>
       )}
     </AnimatePresence>
