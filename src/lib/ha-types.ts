@@ -203,8 +203,11 @@ export function mapHAStatesToTesla(states: HAStateMap): TeslaState {
   const status: TeslaState["status"] = chargingKw > 0.05 ? "charging" : trackerState !== "home" ? "away" : "parked";
 
   return {
-    // Model name isn't exposed as an HA entity/attribute — hardcoded per CLAUDE.md.
-    model: "Model Y",
+    // Model name isn't exposed as an HA entity/attribute (it's HA device-registry
+    // data, not entity state — a different, more complex API than /api/states).
+    // Hardcoded per CLAUDE.md; confirmed against the real HA device page
+    // (2026-07-12): "Model 3 Highland".
+    model: "Model 3 Highland",
     batteryPct: round(num(states, HA_ENTITIES.teslaBattery), 0),
     rangeKm: round(num(states, HA_ENTITIES.teslaRange), 0), // already km
     status,
