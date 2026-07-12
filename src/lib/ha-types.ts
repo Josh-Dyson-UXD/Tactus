@@ -1,12 +1,17 @@
 import { COLORS } from "@/types";
-import type { Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState } from "@/types";
+import type {
+  Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState,
+  HomeLoadState, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
+} from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
 // Real entity IDs confirmed from HA Developer Tools → States, 2026-07-10 —
-// see CLAUDE.md "Entity mapping" section.
+// see CLAUDE.md "Entity mapping" section. Tesla quick-action/comfort entities
+// confirmed 2026-07-12.
 export const HA_ENTITIES = {
   solarPower: "sensor.home_solar_power",
   solarEnergyToday: "sensor.home_solar_generated",
+  homeLoadPower: "sensor.home_load_power",
   powerwallCharge: "sensor.home_percentage_charged",
   powerwallFlow: "sensor.home_battery_power",
   powerwallReserve: "number.home_backup_reserve",
@@ -18,19 +23,51 @@ export const HA_ENTITIES = {
   teslaTracker: "device_tracker.ghost_location",
   teslaLock: "lock.ghost_lock",
   teslaClimate: "climate.ghost_climate",
+  teslaHonk: "button.ghost_honk_horn",
+  teslaFlash: "button.ghost_flash_lights",
+  teslaSentry: "switch.ghost_sentry_mode",
+  teslaValet: "switch.ghost_valet_mode",
+  teslaSeatHeaterFL: "select.ghost_seat_heater_front_left",
+  teslaSeatHeaterFR: "select.ghost_seat_heater_front_right",
+  teslaSteeringWheelHeater: "select.ghost_steering_wheel_heater",
+  teslaFrunk: "cover.ghost_frunk",
+  teslaTrunk: "cover.ghost_trunk",
+  teslaWindows: "cover.ghost_windows",
   outdoorWeather: "weather.forecast_home",
 } as const;
 
 const SOLAR_IDS = new Set<string>([HA_ENTITIES.solarPower, HA_ENTITIES.solarEnergyToday]);
+const HOME_LOAD_IDS = new Set<string>([HA_ENTITIES.homeLoadPower]);
 const POWERWALL_IDS = new Set<string>([HA_ENTITIES.powerwallCharge, HA_ENTITIES.powerwallFlow, HA_ENTITIES.powerwallReserve]);
 const GRID_IDS = new Set<string>([HA_ENTITIES.gridPower]);
 const TESLA_IDS = new Set<string>([
   HA_ENTITIES.teslaBattery, HA_ENTITIES.teslaRange, HA_ENTITIES.teslaChargerPower,
   HA_ENTITIES.teslaInsideTemp, HA_ENTITIES.teslaTracker, HA_ENTITIES.teslaLock, HA_ENTITIES.teslaClimate,
+  HA_ENTITIES.teslaHonk, HA_ENTITIES.teslaFlash, HA_ENTITIES.teslaSentry, HA_ENTITIES.teslaValet,
+  HA_ENTITIES.teslaSeatHeaterFL, HA_ENTITIES.teslaSeatHeaterFR, HA_ENTITIES.teslaSteeringWheelHeater,
+  HA_ENTITIES.teslaFrunk, HA_ENTITIES.teslaTrunk, HA_ENTITIES.teslaWindows,
 ]);
 const OUTDOOR_IDS = new Set<string>([HA_ENTITIES.outdoorWeather]);
 
+// Reverse lookup for clearing a pending Tesla control once its entity's
+// state_changed confirms. climate.ghost_climate backs three separate keys
+// (on/off, preset, fan mode) — that one's handled as a special case by the
+// caller instead of through this map, since a single entity can't map to
+// three keys.
+export const TESLA_CONTROL_ENTITY: Partial<Record<string, TeslaControlKey>> = {
+  [HA_ENTITIES.teslaLock]: "lock",
+  [HA_ENTITIES.teslaSentry]: "sentry",
+  [HA_ENTITIES.teslaValet]: "valet",
+  [HA_ENTITIES.teslaSeatHeaterFL]: "seatHeaterFL",
+  [HA_ENTITIES.teslaSeatHeaterFR]: "seatHeaterFR",
+  [HA_ENTITIES.teslaSteeringWheelHeater]: "steeringWheelHeater",
+  [HA_ENTITIES.teslaFrunk]: "frunk",
+  [HA_ENTITIES.teslaTrunk]: "trunk",
+  [HA_ENTITIES.teslaWindows]: "windows",
+};
+
 export function isSolarEntity(id: string)     { return SOLAR_IDS.has(id); }
+export function isHomeLoadEntity(id: string)  { return HOME_LOAD_IDS.has(id); }
 export function isPowerwallEntity(id: string) { return POWERWALL_IDS.has(id); }
 export function isGridEntity(id: string)      { return GRID_IDS.has(id); }
 export function isTeslaEntity(id: string)     { return TESLA_IDS.has(id); }
@@ -197,6 +234,14 @@ export function mapHAStatesToTesla(states: HAStateMap): TeslaState {
   const tracker = states[HA_ENTITIES.teslaTracker];
   const climate = states[HA_ENTITIES.teslaClimate];
   const lock = states[HA_ENTITIES.teslaLock];
+  const sentry = states[HA_ENTITIES.teslaSentry];
+  const valet = states[HA_ENTITIES.teslaValet];
+  const seatFL = states[HA_ENTITIES.teslaSeatHeaterFL];
+  const seatFR = states[HA_ENTITIES.teslaSeatHeaterFR];
+  const wheelHeater = states[HA_ENTITIES.teslaSteeringWheelHeater];
+  const frunk = states[HA_ENTITIES.teslaFrunk];
+  const trunk = states[HA_ENTITIES.teslaTrunk];
+  const windows = states[HA_ENTITIES.teslaWindows];
   const trackerState = tracker?.state ?? "home"; // "not_home" | "home" from device_tracker.ghost_location
   // sensor.ghost_charger_power is already in kW.
   const chargingKw = round(num(states, HA_ENTITIES.teslaChargerPower), 1);
@@ -216,7 +261,25 @@ export function mapHAStatesToTesla(states: HAStateMap): TeslaState {
     climateOn: climate?.state === "on" || climate?.state === "heat" || climate?.state === "cool",
     locked: lock?.state === "locked",
     location: trackerState === "home" ? "Parked at home" : "Away",
+    sentryMode: sentry?.state === "on",
+    valetMode: valet?.state === "on",
+    seatHeaterFL: (seatFL?.state as SeatHeaterLevel) ?? "off",
+    seatHeaterFR: (seatFR?.state as SeatHeaterLevel) ?? "off",
+    steeringWheelHeater: (wheelHeater?.state as SteeringHeaterLevel) ?? "off",
+    climatePreset: (climate?.attributes.preset_mode as ClimatePreset) ?? "off",
+    climateFanMode: (climate?.attributes.fan_mode as ClimateFanMode) ?? "off",
+    // Covers report "open"/"closed" (also transiently "opening"/"closing") —
+    // treat anything other than a confirmed "open" as closed for display;
+    // the pending pulse (not this state string) covers the in-between UI.
+    frunkOpen: frunk?.state === "open",
+    trunkOpen: trunk?.state === "open",
+    windowsOpen: windows?.state === "open",
   };
+}
+
+export function mapHAStatesToHomeLoad(states: HAStateMap): HomeLoadState {
+  // sensor.home_load_power is already in kW (e.g. 0.354).
+  return { loadKw: round(num(states, HA_ENTITIES.homeLoadPower), 2) };
 }
 
 export function mapHAStatesToOutdoor(states: HAStateMap): OutdoorState {
