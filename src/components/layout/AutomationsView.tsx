@@ -1,8 +1,15 @@
+import { useEffect, useState } from "react";
 import type { AutomationState, SceneState } from "@/types";
 import { ChevronLeft } from "@/components/icons";
 import { SectionHeading } from "@/components/layout/SectionHeading";
 import { AutomationCard } from "@/components/cards/AutomationCard";
 import { SceneCard } from "@/components/cards/SceneCard";
+
+// "Last run" is rendered from relativeTime() at render time, so on the
+// always-on wall display it would freeze between renders. A light periodic
+// tick forces a re-render of this view (cheap — a handful of cards) to keep
+// it current without lifting a live clock into app state.
+const RELATIVE_TIME_TICK_MS = 60_000;
 
 export function AutomationsView({ automations, scenes, onBack, onToggleAutomation, onRunAutomation, onActivateScene }: {
   automations: AutomationState[];
@@ -12,6 +19,12 @@ export function AutomationsView({ automations, scenes, onBack, onToggleAutomatio
   onRunAutomation: (id: string) => void;
   onActivateScene: (id: string) => void;
 }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), RELATIVE_TIME_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
       <div className="sticky top-0 z-10" style={{ background: "var(--tactus-bg-blur)", backdropFilter: "blur(16px)", borderBottom: "1px solid var(--tactus-bg-overlay)" }}>

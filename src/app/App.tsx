@@ -3,17 +3,21 @@ import { motion, AnimatePresence } from "motion/react";
 import type {
   Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, Color,
   ControlStatus, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
+  AutomationState, SceneState, MainView,
 } from "@/types";
 import { HAClient } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
   mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapLightEntity, computeRoomBrightness, hexToRgb,
+  mapHAStatesToAutomations, mapHAStatesToScenes, mapAutomationEntity, mapSceneEntity,
   HA_ENTITIES, TESLA_CONTROL_ENTITY,
   isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity,
+  isAutomationEntity, isSceneEntity,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
+import { AutomationsView } from "@/components/layout/AutomationsView";
 
 // Local-network-only: the token stays in this build's env and never leaves
 // the LAN. Set VITE_HA_URL / VITE_HA_TOKEN in .env.local (see .env.example).
@@ -42,6 +46,16 @@ export default function App() {
   const [connError, setConnError]  = useState<string | null>(null);
   const [selectedRoomId, setRoomId] = useState<string | null>(null);
   const [teslaControl, setTeslaControl] = useState<Record<TeslaControlKey, ControlStatus>>(IDLE_TESLA_CONTROL);
+  const [automations, setAutomations] = useState<AutomationState[]>([]);
+  const [scenes, setScenes]           = useState<SceneState[]>([]);
+
+  // Single source of truth for top-level nav — house/room world vs. the
+  // automations & scenes panel. selectedRoomId only means anything while
+  // mainView === "house"; entering "automations" clears it so "back" always
+  // lands on the house grid, never a stale room.
+  const [mainView, setMainView] = useState<MainView>("house");
+  const openAutomations  = useCallback(() => { setRoomId(null); setMainView("automations"); }, []);
+  const closeAutomations = useCallback(() => setMainView("house"), []);
 
   // Full snapshot kept locally so aggregate cards (solar/powerwall/grid/
   // tesla/outdoor, each backed by several entities) can be recomputed from
@@ -50,6 +64,7 @@ export default function App() {
   const clientRef = useRef<HAClient | null>(null);
   const lightPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const teslaPendingRef = useRef<Map<TeslaControlKey, ReturnType<typeof setTimeout>>>(new Map());
+  const automationPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     if (!HA_URL || !HA_TOKEN) {
@@ -70,6 +85,8 @@ export default function App() {
         setTesla(mapHAStatesToTesla(states));
         setOutdoor(mapHAStatesToOutdoor(states));
         setHomeLoad(mapHAStatesToHomeLoad(states));
+        setAutomations(mapHAStatesToAutomations(states));
+        setScenes(mapHAStatesToScenes(states));
       })
       .catch((err) => setConnError(err instanceof Error ? err.message : String(err)));
 
@@ -115,6 +132,30 @@ export default function App() {
         setOutdoor(mapHAStatesToOutdoor(states));
       } else if (isHomeLoadEntity(entityId)) {
         setHomeLoad(mapHAStatesToHomeLoad(states));
+      } else if (isAutomationEntity(entityId)) {
+        const pending = automationPendingRef.current.get(entityId);
+        if (pending) { clearTimeout(pending); automationPendingRef.current.delete(entityId); }
+
+        const updated = mapAutomationEntity(entity);
+        setAutomations((prev) => {
+          const idx = prev.findIndex((a) => a.id === entityId);
+          if (idx === -1) {
+            // Newly-appeared automation (created in HA after initial load) —
+            // dynamic discovery means insert it, not just patch in place.
+            return [...prev, updated].sort((a, b) => a.name.localeCompare(b.name));
+          }
+          const next = prev.slice();
+          next[idx] = updated;
+          return next;
+        });
+      } else if (isSceneEntity(entityId)) {
+        // Scenes carry no mutable state to patch — just ensure a
+        // newly-appeared scene is present in the list.
+        setScenes((prev) => (
+          prev.some((s) => s.id === entityId)
+            ? prev
+            : [...prev, mapSceneEntity(entity)].sort((a, b) => a.name.localeCompare(b.name))
+        ));
       }
     });
 
@@ -126,6 +167,8 @@ export default function App() {
       lightPendingRef.current.clear();
       teslaPendingRef.current.forEach(clearTimeout);
       teslaPendingRef.current.clear();
+      automationPendingRef.current.forEach(clearTimeout);
+      automationPendingRef.current.clear();
     };
   }, []);
 
@@ -276,6 +319,40 @@ export default function App() {
     clientRef.current?.callService("button", "press", {}, { entity_id: HA_ENTITIES.teslaFlash });
   }, []);
 
+  // ─── Automations & scenes ─────────────────────────────────────────────────
+  const setAutomationStatus = useCallback((entityId: string, status: "pending" | "error") => {
+    setAutomations((prev) => prev.map((a) => (a.id === entityId ? { ...a, status } : a)));
+  }, []);
+
+  const toggleAutomation = useCallback((entityId: string, enable: boolean) => {
+    const client = clientRef.current;
+    if (!client) return;
+
+    const existing = automationPendingRef.current.get(entityId);
+    if (existing) clearTimeout(existing);
+
+    setAutomationStatus(entityId, "pending");
+    client.callService("automation", enable ? "turn_on" : "turn_off", {}, { entity_id: entityId });
+
+    const timeout = setTimeout(() => {
+      automationPendingRef.current.delete(entityId);
+      setAutomationStatus(entityId, "error");
+    }, PENDING_TIMEOUT_MS);
+    automationPendingRef.current.set(entityId, timeout);
+  }, [setAutomationStatus]);
+
+  // Manual override button: skip_condition:true is explicit, not relied on as
+  // a default — this must run the automation's actions regardless of whether
+  // its own conditions currently hold. Fire-and-forget: no state to confirm.
+  const triggerAutomation = useCallback((entityId: string) => {
+    clientRef.current?.callService("automation", "trigger", { skip_condition: true }, { entity_id: entityId });
+  }, []);
+
+  // Fire-and-forget — scenes have no on/off state to confirm.
+  const activateScene = useCallback((entityId: string) => {
+    clientRef.current?.callService("scene", "turn_on", {}, { entity_id: entityId });
+  }, []);
+
   const updateRoom  = useCallback((id: string, p: Partial<Room>) => setRooms((prev) => prev.map((r) => r.id === id ? { ...r, ...p } : r)), []);
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId) ?? null;
 
@@ -295,6 +372,13 @@ export default function App() {
     );
   }
 
+  if (mainView === "automations") {
+    return (
+      <AutomationsView automations={automations} scenes={scenes} onBack={closeAutomations}
+        onToggleAutomation={toggleAutomation} onRunAutomation={triggerAutomation} onActivateScene={activateScene} />
+    );
+  }
+
   return (
     <AnimatePresence mode="wait">
       {selectedRoom ? (
@@ -306,6 +390,7 @@ export default function App() {
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
           <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor} homeLoad={homeLoad}
             onNavigate={setRoomId}
+            onOpenAutomations={openAutomations}
             teslaControl={teslaControl}
             teslaActions={{
               toggleClimate: handleToggleTeslaClimate, toggleLock: handleToggleTeslaLock,
