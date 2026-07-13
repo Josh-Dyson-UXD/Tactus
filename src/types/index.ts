@@ -110,6 +110,38 @@ export type TeslaState = {
   windowsOpen: boolean;
 };
 
+// ─── Automations & Scenes ───────────────────────────────────────────────────
+
+// HA reports "on"/"off" for a normally-functioning automation, but
+// "unavailable"/"unknown" when the automation's integration/device can't be
+// reached — that's a distinct, real failure state, not the same thing as a
+// user deliberately disabling it. Kept separate from `status` (below), which
+// only tracks this card's own enable/disable toggle in flight.
+export type AutomationRunState = "on" | "off" | "unavailable";
+
+export type AutomationState = {
+  id: string;                       // entity_id, e.g. "automation.turn_off_lights_at_night"
+  name: string;                     // friendly_name, trimmed
+  state: AutomationRunState;
+  lastTriggered: string | null;     // last_triggered attribute (ISO 8601), or null if never
+  status: ControlStatus;            // enable/disable toggle's pending → confirmed cycle only —
+                                     // "Run now" is fire-and-forget and isn't reflected here
+};
+
+// No persistent on/off state — scenes are fire-and-forget by design. The
+// activation pulse is transient local UI state inside SceneCard, not
+// app-level data.
+export type SceneState = {
+  id: string;                       // entity_id, e.g. "scene.movie_night"
+  name: string;                     // friendly_name, trimmed
+};
+
+// Top-level app view. Deliberately separate from LightState's `Panel` (that's
+// a light card's own internal summary/brightness/color sub-navigation, a
+// different concept). "automations" also holds the Scenes section — kept as
+// one view rather than splitting nav further, per the brief.
+export type MainView = "house" | "automations";
+
 // ─── Room ─────────────────────────────────────────────────────────────────────
 
 export type Room = {

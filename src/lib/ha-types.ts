@@ -2,6 +2,7 @@ import { COLORS } from "@/types";
 import type {
   Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState,
   HomeLoadState, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
+  AutomationState, AutomationRunState, SceneState,
 } from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
@@ -73,6 +74,12 @@ export function isGridEntity(id: string)      { return GRID_IDS.has(id); }
 export function isTeslaEntity(id: string)     { return TESLA_IDS.has(id); }
 export function isOutdoorEntity(id: string)   { return OUTDOOR_IDS.has(id); }
 export function isLightEntity(id: string)     { return id.startsWith("light."); }
+
+// Unlike every other domain above (curated HA_ENTITIES map), automations and
+// scenes are discovered dynamically at runtime by entity_id prefix — see
+// CLAUDE.md task note. There is no fixed list to check membership against.
+export function isAutomationEntity(id: string) { return id.startsWith("automation."); }
+export function isSceneEntity(id: string)      { return id.startsWith("scene."); }
 
 function num(states: HAStateMap, id: string, fallback = 0): number {
   const raw = states[id]?.state;
@@ -280,6 +287,47 @@ export function mapHAStatesToTesla(states: HAStateMap): TeslaState {
 export function mapHAStatesToHomeLoad(states: HAStateMap): HomeLoadState {
   // sensor.home_load_power is already in kW (e.g. 0.354).
   return { loadKw: round(num(states, HA_ENTITIES.homeLoadPower), 2) };
+}
+
+// Per-entity mapper, mirroring mapLightEntity — lets the WS handler patch a
+// single automation in place without recomputing the whole array (and losing
+// any other automation's in-flight `status`). "unavailable"/"unknown" is a
+// real HA integration/device failure, distinct from the user deliberately
+// switching the automation off — kept as its own AutomationRunState rather
+// than collapsed into "off".
+export function mapAutomationEntity(entity: HAEntity): AutomationState {
+  const runState: AutomationRunState =
+    entity.state === "on" ? "on" : entity.state === "off" ? "off" : "unavailable";
+  return {
+    id: entity.entity_id,
+    name: ((entity.attributes.friendly_name as string) ?? entity.entity_id).trim(),
+    state: runState,
+    lastTriggered: (entity.attributes.last_triggered as string | null | undefined) ?? null,
+    status: "idle",
+  };
+}
+
+export function mapSceneEntity(entity: HAEntity): SceneState {
+  return {
+    id: entity.entity_id,
+    name: ((entity.attributes.friendly_name as string) ?? entity.entity_id).trim(),
+  };
+}
+
+// Sorted alphabetically by friendly_name per the brief — dynamic discovery,
+// not a curated list, so there's no other stable order to fall back on.
+export function mapHAStatesToAutomations(states: HAStateMap): AutomationState[] {
+  return Object.values(states)
+    .filter((e) => isAutomationEntity(e.entity_id))
+    .map(mapAutomationEntity)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function mapHAStatesToScenes(states: HAStateMap): SceneState[] {
+  return Object.values(states)
+    .filter((e) => isSceneEntity(e.entity_id))
+    .map(mapSceneEntity)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function mapHAStatesToOutdoor(states: HAStateMap): OutdoorState {

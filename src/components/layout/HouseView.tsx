@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Zap } from "lucide-react";
 import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, ControlStatus, TeslaControlKey, TeslaActions } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { computeRoomBrightness } from "@/lib/ha-types";
@@ -13,9 +14,10 @@ import { RoomCard } from "@/components/cards/RoomCard";
 
 const COMMIT_DELAY = 400;
 
-export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeLoad, onNavigate, teslaControl, teslaActions, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
+export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeLoad, onNavigate, onOpenAutomations, teslaControl, teslaActions, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
   rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState; homeLoad: HomeLoadState;
   onNavigate: (id: string) => void;
+  onOpenAutomations: () => void;
   teslaControl: Record<TeslaControlKey, ControlStatus>;
   teslaActions: TeslaActions;
   onRoomToggle: (room: Room, on: boolean) => void;
@@ -55,6 +57,9 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeL
             <p className="text-[13px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{totalActive} of {totalDevices} devices active</p>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={onOpenAutomations} title="Automations & Scenes" className="flex items-center justify-center size-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "var(--tactus-bg-overlay)", border: "1px solid var(--tactus-border-overlay)" }}>
+              <Zap size={16} color="var(--tactus-text-secondary)" />
+            </button>
             <button onClick={() => onHouseToggle(false)} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "var(--tactus-bg-overlay)", border: "1px solid var(--tactus-border-overlay)", fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)", fontSize: 13, fontWeight: 600 }}>All Off</button>
             <button onClick={() => onHouseToggle(true)} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: withAlpha("#FFF9E5", 0.1), border: `1px solid ${withAlpha("#FFF9E5", 0.2)}`, fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-warm-white)", fontSize: 13, fontWeight: 600 }}>All On</button>
           </div>
