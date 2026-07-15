@@ -62,7 +62,7 @@ export function EnvironmentBar({ rooms, indoor, outdoor }: { rooms: Room[]; indo
             <p className="text-[11px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>{outdoor.condition}</p>
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-4">
-            <EnvMetric icon={<Thermometer size={12} />} value={outdoor.tempC.toFixed(1)}    unit="°C"   label="Temp"     color={tempColor(outdoor.tempC)} />
+            {outdoor.tempC !== null && <EnvMetric icon={<Thermometer size={12} />} value={outdoor.tempC.toFixed(1)} unit="°C" label="Temp" color={tempColor(outdoor.tempC)} />}
             <EnvMetric icon={<Droplets    size={12} />} value={outdoor.humidity.toFixed(0)}  unit="%"    label="Humidity" color={humidColor(outdoor.humidity)} />
             <EnvMetric icon={<Wind        size={12} />} value={outdoor.aqi.toFixed(0)}       unit=" AQI" label="Air"      color={aqiColor(outdoor.aqi)} />
             <EnvMetric icon={<span style={{ fontSize: 10, fontWeight: 700 }}>PM</span>}      value={outdoor.pm25.toFixed(1)} unit=" µg" label="PM2.5" color={aqiColor(outdoor.aqi)} />
