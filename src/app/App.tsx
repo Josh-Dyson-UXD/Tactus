@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type {
-  Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, Color,
+  Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, IndoorState, Color,
   ControlStatus, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
   AutomationState, SceneState, MainView,
 } from "@/types";
@@ -9,10 +9,10 @@ import { HAClient } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
-  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapLightEntity, computeRoomBrightness, hexToRgb,
+  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapHAStatesToIndoor, mapLightEntity, computeRoomBrightness, hexToRgb,
   mapHAStatesToAutomations, mapHAStatesToScenes, mapAutomationEntity, mapSceneEntity,
   HA_ENTITIES, TESLA_CONTROL_ENTITY,
-  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity,
+  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isIndoorEntity,
   isAutomationEntity, isSceneEntity,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
@@ -43,6 +43,7 @@ export default function App() {
   const [tesla, setTesla]           = useState<TeslaState | null>(null);
   const [outdoor, setOutdoor]       = useState<OutdoorState | null>(null);
   const [homeLoad, setHomeLoad]     = useState<HomeLoadState | null>(null);
+  const [indoor, setIndoor]         = useState<IndoorState | null>(null);
   const [connError, setConnError]  = useState<string | null>(null);
   const [selectedRoomId, setRoomId] = useState<string | null>(null);
   const [teslaControl, setTeslaControl] = useState<Record<TeslaControlKey, ControlStatus>>(IDLE_TESLA_CONTROL);
@@ -85,6 +86,7 @@ export default function App() {
         setTesla(mapHAStatesToTesla(states));
         setOutdoor(mapHAStatesToOutdoor(states));
         setHomeLoad(mapHAStatesToHomeLoad(states));
+        setIndoor(mapHAStatesToIndoor(states));
         setAutomations(mapHAStatesToAutomations(states));
         setScenes(mapHAStatesToScenes(states));
       })
@@ -132,6 +134,8 @@ export default function App() {
         setOutdoor(mapHAStatesToOutdoor(states));
       } else if (isHomeLoadEntity(entityId)) {
         setHomeLoad(mapHAStatesToHomeLoad(states));
+      } else if (isIndoorEntity(entityId)) {
+        setIndoor(mapHAStatesToIndoor(states));
       } else if (isAutomationEntity(entityId)) {
         const pending = automationPendingRef.current.get(entityId);
         if (pending) { clearTimeout(pending); automationPendingRef.current.delete(entityId); }
@@ -364,7 +368,7 @@ export default function App() {
     );
   }
 
-  if (!solar || !powerwall || !grid || !tesla || !outdoor || !homeLoad) {
+  if (!solar || !powerwall || !grid || !tesla || !outdoor || !homeLoad || !indoor) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--tactus-bg-base)" }}>
         <p className="text-[14px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Connecting to Home Assistant…</p>
@@ -388,7 +392,7 @@ export default function App() {
         </motion.div>
       ) : (
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
-          <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor} homeLoad={homeLoad}
+          <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor} homeLoad={homeLoad} indoor={indoor}
             onNavigate={setRoomId}
             onOpenAutomations={openAutomations}
             teslaControl={teslaControl}

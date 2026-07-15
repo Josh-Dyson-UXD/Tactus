@@ -55,7 +55,15 @@ export type PowerwallState = {
 
 export type GridState = { importKw: number; exportKw: number };
 
-export type OutdoorState = { tempC: number; humidity: number; aqi: number; pm25: number; condition: string };
+// tempC is null when neither the car nor the weather fallback has a usable
+// reading — see mapHAStatesToOutdoor's car-then-weather preference order.
+export type OutdoorState = { tempC: number | null; humidity: number; aqi: number; pm25: number; condition: string };
+
+// Dedicated indoor sensor reading (sensor.kids_room_kids_temperature_*), not
+// the per-room Matter SensorState array — that's deferred/empty per
+// CLAUDE.md. null (not 0) means the entity is unavailable/unknown — the
+// panel renders blank rather than a misleading zero.
+export type IndoorState = { tempC: number | null; humidityPct: number | null };
 
 // sensor.home_load_power — instantaneous whole-home draw, kW.
 export type HomeLoadState = { loadKw: number };

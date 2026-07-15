@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Zap } from "lucide-react";
-import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, ControlStatus, TeslaControlKey, TeslaActions } from "@/types";
+import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, IndoorState, ControlStatus, TeslaControlKey, TeslaActions } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { computeRoomBrightness } from "@/lib/ha-types";
 import { RoomControls } from "@/components/controls/RoomControls";
@@ -14,8 +14,8 @@ import { RoomCard } from "@/components/cards/RoomCard";
 
 const COMMIT_DELAY = 400;
 
-export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeLoad, onNavigate, onOpenAutomations, teslaControl, teslaActions, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
-  rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState; homeLoad: HomeLoadState;
+export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeLoad, indoor, onNavigate, onOpenAutomations, teslaControl, teslaActions, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
+  rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState; homeLoad: HomeLoadState; indoor: IndoorState;
   onNavigate: (id: string) => void;
   onOpenAutomations: () => void;
   teslaControl: Record<TeslaControlKey, ControlStatus>;
@@ -68,7 +68,7 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeL
       </div>
 
       <div className="p-8 flex flex-col gap-10">
-        <EnvironmentBar rooms={rooms} outdoor={outdoor} />
+        <EnvironmentBar rooms={rooms} indoor={indoor} outdoor={outdoor} />
 
         <div>
           <SectionHeading label="Energy" />
