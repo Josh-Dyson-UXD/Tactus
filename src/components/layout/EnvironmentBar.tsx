@@ -1,5 +1,5 @@
 import { Thermometer, Droplets, Wind } from "lucide-react";
-import type { Room, OutdoorState, TempSensor, HumidSensor, AQISensor } from "@/types";
+import type { Room, OutdoorState, IndoorState, AQISensor } from "@/types";
 
 function avg(nums: number[]) { return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null; }
 
@@ -18,16 +18,17 @@ function EnvMetric({ icon, value, unit, label, color }: { icon: React.ReactNode;
   );
 }
 
-export function EnvironmentBar({ rooms, outdoor }: { rooms: Room[]; outdoor: OutdoorState }) {
+export function EnvironmentBar({ rooms, indoor, outdoor }: { rooms: Room[]; indoor: IndoorState; outdoor: OutdoorState }) {
   const allSensors = rooms.flatMap((r) => r.sensors);
 
-  const temps  = allSensors.filter((s) => s.data.kind === "temp").map((s) => (s.data as TempSensor).tempC);
-  const humids = allSensors.filter((s) => s.data.kind === "humidity").map((s) => (s.data as HumidSensor).humidity);
-  const aqis   = allSensors.filter((s) => s.data.kind === "aqi").map((s) => (s.data as AQISensor).aqi);
-  const co2s   = allSensors.filter((s) => s.data.kind === "aqi").map((s) => (s.data as AQISensor).co2);
+  // AQI/CO2 still come from per-room Matter sensors (deferred/empty per
+  // CLAUDE.md — not part of this task). Temp/humidity now come from the
+  // dedicated indoor sensor entity instead of an averaged room sensor array.
+  const aqis = allSensors.filter((s) => s.data.kind === "aqi").map((s) => (s.data as AQISensor).aqi);
+  const co2s = allSensors.filter((s) => s.data.kind === "aqi").map((s) => (s.data as AQISensor).co2);
 
-  const indoorTemp  = avg(temps);
-  const indoorHumid = avg(humids);
+  const indoorTemp  = indoor.tempC;
+  const indoorHumid = indoor.humidityPct;
   const indoorAqi   = avg(aqis);
   const indoorCo2   = avg(co2s);
 

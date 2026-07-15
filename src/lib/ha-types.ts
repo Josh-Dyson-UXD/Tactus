@@ -2,7 +2,7 @@ import { COLORS } from "@/types";
 import type {
   Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState,
   HomeLoadState, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
-  AutomationState, AutomationRunState, SceneState,
+  AutomationState, AutomationRunState, SceneState, IndoorState,
 } from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
@@ -35,6 +35,8 @@ export const HA_ENTITIES = {
   teslaTrunk: "cover.ghost_trunk",
   teslaWindows: "cover.ghost_windows",
   outdoorWeather: "weather.forecast_home",
+  indoorTemp: "sensor.kids_room_kids_temperature_temperature",
+  indoorHumidity: "sensor.kids_room_kids_temperature_humidity",
 } as const;
 
 const SOLAR_IDS = new Set<string>([HA_ENTITIES.solarPower, HA_ENTITIES.solarEnergyToday]);
@@ -49,6 +51,7 @@ const TESLA_IDS = new Set<string>([
   HA_ENTITIES.teslaFrunk, HA_ENTITIES.teslaTrunk, HA_ENTITIES.teslaWindows,
 ]);
 const OUTDOOR_IDS = new Set<string>([HA_ENTITIES.outdoorWeather]);
+const INDOOR_IDS = new Set<string>([HA_ENTITIES.indoorTemp, HA_ENTITIES.indoorHumidity]);
 
 // Reverse lookup for clearing a pending Tesla control once its entity's
 // state_changed confirms. climate.ghost_climate backs three separate keys
@@ -73,6 +76,7 @@ export function isPowerwallEntity(id: string) { return POWERWALL_IDS.has(id); }
 export function isGridEntity(id: string)      { return GRID_IDS.has(id); }
 export function isTeslaEntity(id: string)     { return TESLA_IDS.has(id); }
 export function isOutdoorEntity(id: string)   { return OUTDOOR_IDS.has(id); }
+export function isIndoorEntity(id: string)    { return INDOOR_IDS.has(id); }
 export function isLightEntity(id: string)     { return id.startsWith("light."); }
 
 // Unlike every other domain above (curated HA_ENTITIES map), automations and
@@ -92,6 +96,16 @@ function num(states: HAStateMap, id: string, fallback = 0): number {
 function round(n: number, decimals: number): number {
   const f = 10 ** decimals;
   return Math.round(n * f) / f;
+}
+
+// Like num(), but preserves "no real reading" as null instead of coercing to
+// a fallback — unavailable/unknown/missing entities should render blank, not
+// a misleading 0.
+function numOrNull(states: HAStateMap, id: string, decimals: number): number | null {
+  const raw = states[id]?.state;
+  if (raw === undefined || raw === "unavailable" || raw === "unknown") return null;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? round(n, decimals) : null;
 }
 
 export function hexToRgb(hex: string): [number, number, number] {
@@ -328,6 +342,13 @@ export function mapHAStatesToScenes(states: HAStateMap): SceneState[] {
     .filter((e) => isSceneEntity(e.entity_id))
     .map(mapSceneEntity)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function mapHAStatesToIndoor(states: HAStateMap): IndoorState {
+  return {
+    tempC: numOrNull(states, HA_ENTITIES.indoorTemp, 1),
+    humidityPct: numOrNull(states, HA_ENTITIES.indoorHumidity, 0),
+  };
 }
 
 export function mapHAStatesToOutdoor(states: HAStateMap): OutdoorState {
