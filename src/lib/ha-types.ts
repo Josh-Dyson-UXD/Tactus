@@ -37,12 +37,7 @@ export const HA_ENTITIES = {
   outdoorWeather: "weather.forecast_home",
   indoorTemp: "sensor.kids_room_kids_temperature_temperature",
   indoorHumidity: "sensor.kids_room_kids_temperature_humidity",
-  carOutsideTemp: "sensor.ghost_outside_temperature",
 } as const;
-
-// The car only reports while awake, so a reading older than this must not
-// stick around looking live — fall back to the weather entity instead.
-export const OUTDOOR_CAR_MAX_AGE_MS = 30 * 60 * 1000;
 
 const SOLAR_IDS = new Set<string>([HA_ENTITIES.solarPower, HA_ENTITIES.solarEnergyToday]);
 const HOME_LOAD_IDS = new Set<string>([HA_ENTITIES.homeLoadPower]);
@@ -55,7 +50,7 @@ const TESLA_IDS = new Set<string>([
   HA_ENTITIES.teslaSeatHeaterFL, HA_ENTITIES.teslaSeatHeaterFR, HA_ENTITIES.teslaSteeringWheelHeater,
   HA_ENTITIES.teslaFrunk, HA_ENTITIES.teslaTrunk, HA_ENTITIES.teslaWindows,
 ]);
-const OUTDOOR_IDS = new Set<string>([HA_ENTITIES.outdoorWeather, HA_ENTITIES.carOutsideTemp]);
+const OUTDOOR_IDS = new Set<string>([HA_ENTITIES.outdoorWeather]);
 const INDOOR_IDS = new Set<string>([HA_ENTITIES.indoorTemp, HA_ENTITIES.indoorHumidity]);
 
 // Reverse lookup for clearing a pending Tesla control once its entity's
@@ -356,32 +351,16 @@ export function mapHAStatesToIndoor(states: HAStateMap): IndoorState {
   };
 }
 
-// Car reads live only while awake — trust it only if it's a real number,
-// not unavailable/unknown, and its last_updated is within
-// OUTDOOR_CAR_MAX_AGE_MS, otherwise a stale awake-time reading would stick
-// around looking current. No device_tracker "home" gate: the tracker
-// (HA_ENTITIES.teslaTracker) is already mapped, but it's dispatched down the
-// isTeslaEntity branch in App.tsx's WS handler, not isOutdoorEntity, so
-// wiring it in here wouldn't actually get a recompute on location change —
-// not the "trivial" case the brief called for. Freshness alone covers the
-// "car went away and stopped reporting" case anyway.
-function carOutdoorTempC(states: HAStateMap): number | null {
-  const car = states[HA_ENTITIES.carOutsideTemp];
-  if (!car || car.state === "unavailable" || car.state === "unknown") return null;
-  const n = parseFloat(car.state);
-  if (!Number.isFinite(n)) return null;
-  const updatedAt = new Date(car.last_updated).getTime();
-  if (!Number.isFinite(updatedAt) || Date.now() - updatedAt > OUTDOOR_CAR_MAX_AGE_MS) return null;
-  return round(n, 1);
-}
-
 export function mapHAStatesToOutdoor(states: HAStateMap): OutdoorState {
   const weather = states[HA_ENTITIES.outdoorWeather];
+  // Same spirit as numOrNull: an unavailable/unknown entity or a missing
+  // attribute renders blank, not a misleading 0.
+  const isUnavailable = weather?.state === "unavailable" || weather?.state === "unknown";
   const weatherTempRaw = weather?.attributes.temperature as number | undefined;
-  const weatherTempC = typeof weatherTempRaw === "number" ? round(weatherTempRaw, 1) : null;
+  const tempC = !isUnavailable && typeof weatherTempRaw === "number" ? round(weatherTempRaw, 1) : null;
 
   return {
-    tempC: carOutdoorTempC(states) ?? weatherTempC,
+    tempC,
     humidity: (weather?.attributes.humidity as number) ?? 0,
     // No AQI/PM2.5 sensor exists in HA yet (per CLAUDE.md "Deferred" section).
     // Left at 0 rather than reading a nonexistent entity — revisit once an
