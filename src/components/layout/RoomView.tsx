@@ -26,11 +26,19 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
 
   // This header's "All On/Off" and brightness bar previously only mutated
   // local state via onUpdateRoom, same gap as RoomCard/HouseView had — never
-  // called real HA services. Fixed to reuse the real per-light
-  // onLightToggle/onLightBrightness props already used by the LightCards on
-  // this same page. Switches aren't touched (no real switch entities exist).
-  const allOn  = () => lights.forEach((l) => { if (l.cardState !== "error") onLightToggle(l.id, true); });
-  const allOff = () => lights.forEach((l) => { if (l.cardState !== "error") onLightToggle(l.id, false); });
+  // called real HA services. Fixed to reuse the real per-light/per-switch
+  // onLightToggle/onSwitchToggle/onLightBrightness props already used by the
+  // cards on this same page — each entity rides its own independent
+  // pending → confirmed cycle. Brightness stays lights-only below; a switch
+  // has no brightness.
+  const allOn  = () => {
+    lights.forEach((l) => { if (l.cardState !== "error") onLightToggle(l.id, true); });
+    switches.forEach((s) => { if (s.status !== "error") onSwitchToggle(s.id, true); });
+  };
+  const allOff = () => {
+    lights.forEach((l) => { if (l.cardState !== "error") onLightToggle(l.id, false); });
+    switches.forEach((s) => { if (s.status !== "error") onSwitchToggle(s.id, false); });
+  };
 
   // Same local-state + 400ms debounce pattern as RoomCard/HouseView — without
   // it, dragging this slider would flood every light in the room with a
