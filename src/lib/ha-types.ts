@@ -45,8 +45,16 @@ export const HA_ENTITIES = {
 // its entity_id (and HA area) saying "kids_room" — SwitchState is otherwise
 // deferred per CLAUDE.md, so this is the one curated entry until more switch
 // entities are added to HA.
+//
+// Must match the slug the living-room LIGHTS resolve to, not the two-word
+// "living_room" you'd expect — mapHAStatesToRooms falls back to
+// objectId.split("_")[0] when no attributes.room is present, so
+// light.living_room_* entities land in slug "living" (first underscore
+// token only), same reason light.front_door_* lands in "front". Landing the
+// switch in "living_room" instead spawned a second, phantom Living Room
+// card with 0% brightness and just the plug in it.
 const SWITCH_ROOM_OVERRIDE: Record<string, string> = {
-  [HA_ENTITIES.donutSwitch]: "living_room",
+  [HA_ENTITIES.donutSwitch]: "living",
 };
 
 const SOLAR_IDS = new Set<string>([HA_ENTITIES.solarPower, HA_ENTITIES.solarEnergyToday]);

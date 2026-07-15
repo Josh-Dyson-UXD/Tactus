@@ -258,25 +258,33 @@ export default function App() {
   }, [setSwitchStatus]);
 
   // Room-level bulk toggle/brightness: no separate room-level pending state —
-  // each affected light fires its own independent controlLight() call and
-  // rides the same per-light pending → confirmed cycle from step 4. The
-  // room card's dots/aggregates are already computed from real cardState,
-  // so they reflect reality as each light confirms independently.
+  // each affected light (and, for on/off, each switch) fires its own
+  // independent controlLight()/handleSwitchToggle() call and rides the same
+  // per-entity pending → confirmed cycle already used for individual
+  // toggles. The room card's dots/aggregates are already computed from real
+  // cardState/status, so they reflect reality as each entity confirms
+  // independently. Brightness stays lights-only — a switch has no
+  // brightness and must never get a brightness service call.
   const handleRoomToggle = useCallback((room: Room, on: boolean) => {
     room.lights.forEach((l) => { if (l.cardState !== "error") handleLightToggle(l.id, on); });
-  }, [handleLightToggle]);
+    room.switches.forEach((s) => { if (s.status !== "error") handleSwitchToggle(s.id, on); });
+  }, [handleLightToggle, handleSwitchToggle]);
 
   const handleRoomBrightness = useCallback((room: Room, brightnessPct: number) => {
     room.lights.forEach((l) => { if (l.cardState === "on") handleLightBrightness(l.id, brightnessPct); });
   }, [handleLightBrightness]);
 
   // Whole-house bulk toggle/brightness: same fan-out, just across every
-  // room's lights instead of one room's. The brightness slider debounces in
-  // HouseView before this ever fires, since this is even more flood-prone
-  // (potentially 15+ lights at once) than the room-level case.
+  // room's lights (and switches, for on/off) instead of one room's. The
+  // brightness slider debounces in HouseView before this ever fires, since
+  // this is even more flood-prone (potentially 15+ lights at once) than the
+  // room-level case.
   const handleHouseToggle = useCallback((on: boolean) => {
-    rooms.forEach((room) => room.lights.forEach((l) => { if (l.cardState !== "error") handleLightToggle(l.id, on); }));
-  }, [rooms, handleLightToggle]);
+    rooms.forEach((room) => {
+      room.lights.forEach((l) => { if (l.cardState !== "error") handleLightToggle(l.id, on); });
+      room.switches.forEach((s) => { if (s.status !== "error") handleSwitchToggle(s.id, on); });
+    });
+  }, [rooms, handleLightToggle, handleSwitchToggle]);
 
   const handleHouseBrightness = useCallback((brightnessPct: number) => {
     rooms.forEach((room) => room.lights.forEach((l) => { if (l.cardState === "on") handleLightBrightness(l.id, brightnessPct); }));
