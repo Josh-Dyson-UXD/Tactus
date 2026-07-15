@@ -9,10 +9,10 @@ import { HAClient } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
-  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapHAStatesToIndoor, mapLightEntity, computeRoomBrightness, hexToRgb,
+  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapHAStatesToIndoor, mapLightEntity, mapSwitchEntity, computeRoomBrightness, hexToRgb,
   mapHAStatesToAutomations, mapHAStatesToScenes, mapAutomationEntity, mapSceneEntity,
   HA_ENTITIES, TESLA_CONTROL_ENTITY,
-  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isIndoorEntity,
+  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isIndoorEntity, isSwitchEntity,
   isAutomationEntity, isSceneEntity,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
@@ -66,6 +66,7 @@ export default function App() {
   const lightPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const teslaPendingRef = useRef<Map<TeslaControlKey, ReturnType<typeof setTimeout>>>(new Map());
   const automationPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const switchPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     if (!HA_URL || !HA_TOKEN) {
@@ -108,6 +109,16 @@ export default function App() {
           const lights = r.lights.map((l) => (l.id === entityId ? updated : l));
           return { ...r, lights, roomBrightness: computeRoomBrightness(lights) };
         }));
+      } else if (isSwitchEntity(entityId)) {
+        const pending = switchPendingRef.current.get(entityId);
+        if (pending) { clearTimeout(pending); switchPendingRef.current.delete(entityId); }
+
+        const updated = mapSwitchEntity(entity);
+        setRooms((prev) => prev.map((r) => (
+          r.switches.some((s) => s.id === entityId)
+            ? { ...r, switches: r.switches.map((s) => (s.id === entityId ? updated : s)) }
+            : r
+        )));
       } else if (isSolarEntity(entityId)) {
         setSolar(mapHAStatesToSolar(states));
       } else if (isPowerwallEntity(entityId)) {
@@ -173,6 +184,8 @@ export default function App() {
       teslaPendingRef.current.clear();
       automationPendingRef.current.forEach(clearTimeout);
       automationPendingRef.current.clear();
+      switchPendingRef.current.forEach(clearTimeout);
+      switchPendingRef.current.clear();
     };
   }, []);
 
@@ -217,6 +230,32 @@ export default function App() {
   const handleLightColorTemp = useCallback((entityId: string, kelvin: number) => {
     controlLight(entityId, "turn_on", { color_temp_kelvin: kelvin });
   }, [controlLight]);
+
+  // ─── Switch control: same pending → confirmed cycle as lights ───────────
+  const setSwitchStatus = useCallback((entityId: string, status: "pending" | "error") => {
+    setRooms((prev) => prev.map((r) => (
+      r.switches.some((s) => s.id === entityId)
+        ? { ...r, switches: r.switches.map((s) => (s.id === entityId ? { ...s, status } : s)) }
+        : r
+    )));
+  }, []);
+
+  const handleSwitchToggle = useCallback((entityId: string, on: boolean) => {
+    const client = clientRef.current;
+    if (!client) return;
+
+    const existing = switchPendingRef.current.get(entityId);
+    if (existing) clearTimeout(existing);
+
+    setSwitchStatus(entityId, "pending");
+    client.callService("switch", on ? "turn_on" : "turn_off", {}, { entity_id: entityId });
+
+    const timeout = setTimeout(() => {
+      switchPendingRef.current.delete(entityId);
+      setSwitchStatus(entityId, "error");
+    }, PENDING_TIMEOUT_MS);
+    switchPendingRef.current.set(entityId, timeout);
+  }, [setSwitchStatus]);
 
   // Room-level bulk toggle/brightness: no separate room-level pending state —
   // each affected light fires its own independent controlLight() call and
@@ -388,7 +427,8 @@ export default function App() {
       {selectedRoom ? (
         <motion.div key={selectedRoom.id} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
           <RoomView room={selectedRoom} onBack={() => setRoomId(null)} onUpdateRoom={(p) => updateRoom(selectedRoom.id, p)}
-            onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} onLightColorTemp={handleLightColorTemp} />
+            onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} onLightColorTemp={handleLightColorTemp}
+            onSwitchToggle={handleSwitchToggle} />
         </motion.div>
       ) : (
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>

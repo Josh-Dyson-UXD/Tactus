@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { Room, LightState, SwitchState, Color } from "@/types";
+import type { Room, LightState, Color } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { ChevronLeft } from "@/components/icons";
 import { RoomControls } from "@/components/controls/RoomControls";
@@ -10,19 +10,19 @@ import { SensorCard } from "@/components/cards/SensorCard";
 
 const COMMIT_DELAY = 400;
 
-export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor, onLightColorTemp }: {
+export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor, onLightColorTemp, onSwitchToggle }: {
   room: Room; onBack: () => void; onUpdateRoom: (p: Partial<Room>) => void;
   onLightToggle: (entityId: string, on: boolean) => void;
   onLightBrightness: (entityId: string, v: number) => void;
   onLightColor: (entityId: string, c: Color) => void;
   onLightColorTemp: (entityId: string, kelvin: number) => void;
+  onSwitchToggle: (entityId: string, on: boolean) => void;
 }) {
   const { lights, switches, sensors, roomBrightness, name } = room;
   const activeCount = lights.filter(l => l.cardState === "on").length + switches.filter(s => s.isOn).length;
   const totalCount  = lights.length + switches.length;
 
-  const updateLight  = (id: string, p: Partial<LightState>)  => onUpdateRoom({ lights:   lights.map((l) => l.id === id ? { ...l, ...p } : l) });
-  const updateSwitch = (id: string, p: Partial<SwitchState>) => onUpdateRoom({ switches: switches.map((s) => s.id === id ? { ...s, ...p } : s) });
+  const updateLight = (id: string, p: Partial<LightState>) => onUpdateRoom({ lights: lights.map((l) => l.id === id ? { ...l, ...p } : l) });
 
   // This header's "All On/Off" and brightness bar previously only mutated
   // local state via onUpdateRoom, same gap as RoomCard/HouseView had — never
@@ -95,7 +95,7 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
           <div>
             <SectionHeading label="Smart Plugs" count={switches.length} />
             <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", alignItems: "start" }}>
-              {switches.map((s) => <SwitchCard key={s.id} state={s} onChange={(p) => updateSwitch(s.id, p)} />)}
+              {switches.map((s) => <SwitchCard key={s.id} state={s} onToggle={(on) => onSwitchToggle(s.id, on)} />)}
             </div>
           </div>
         )}

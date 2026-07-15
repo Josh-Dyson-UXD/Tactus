@@ -31,6 +31,8 @@ export type LightState = {
 export type SwitchState = {
   id: string; device: string; type: "switch";
   isOn: boolean; wattsNow: number; todayKwh: number;
+  metered: boolean;      // false for plain on/off switches with no power sensor (e.g. a Kasa switch)
+  status: ControlStatus; // toggle's pending → confirmed cycle, mirrors LightState's cardState pending/error
 };
 
 export type MotionSensor   = { kind: "motion";   motionDetected: boolean; lastSeen: string };
