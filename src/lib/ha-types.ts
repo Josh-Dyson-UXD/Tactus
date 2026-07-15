@@ -2,7 +2,7 @@ import { COLORS } from "@/types";
 import type {
   Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState,
   HomeLoadState, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
-  AutomationState, AutomationRunState, SceneState, IndoorState,
+  AutomationState, AutomationRunState, SceneState, IndoorState, SwitchState,
 } from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
@@ -37,12 +37,23 @@ export const HA_ENTITIES = {
   outdoorWeather: "weather.forecast_home",
   indoorTemp: "sensor.kids_room_kids_temperature_temperature",
   indoorHumidity: "sensor.kids_room_kids_temperature_humidity",
+  donutSwitch: "switch.kids_room_usb_lamp",
 } as const;
+
+// Explicit switch → room placement, not derived from the HA area/entity_id.
+// switch.kids_room_usb_lamp physically controls a Living Room lamp despite
+// its entity_id (and HA area) saying "kids_room" — SwitchState is otherwise
+// deferred per CLAUDE.md, so this is the one curated entry until more switch
+// entities are added to HA.
+const SWITCH_ROOM_OVERRIDE: Record<string, string> = {
+  [HA_ENTITIES.donutSwitch]: "living_room",
+};
 
 const SOLAR_IDS = new Set<string>([HA_ENTITIES.solarPower, HA_ENTITIES.solarEnergyToday]);
 const HOME_LOAD_IDS = new Set<string>([HA_ENTITIES.homeLoadPower]);
 const POWERWALL_IDS = new Set<string>([HA_ENTITIES.powerwallCharge, HA_ENTITIES.powerwallFlow, HA_ENTITIES.powerwallReserve]);
 const GRID_IDS = new Set<string>([HA_ENTITIES.gridPower]);
+const SWITCH_IDS = new Set<string>([HA_ENTITIES.donutSwitch]);
 const TESLA_IDS = new Set<string>([
   HA_ENTITIES.teslaBattery, HA_ENTITIES.teslaRange, HA_ENTITIES.teslaChargerPower,
   HA_ENTITIES.teslaInsideTemp, HA_ENTITIES.teslaTracker, HA_ENTITIES.teslaLock, HA_ENTITIES.teslaClimate,
@@ -77,6 +88,7 @@ export function isGridEntity(id: string)      { return GRID_IDS.has(id); }
 export function isTeslaEntity(id: string)     { return TESLA_IDS.has(id); }
 export function isOutdoorEntity(id: string)   { return OUTDOOR_IDS.has(id); }
 export function isIndoorEntity(id: string)    { return INDOOR_IDS.has(id); }
+export function isSwitchEntity(id: string)    { return SWITCH_IDS.has(id); }
 export function isLightEntity(id: string)     { return id.startsWith("light."); }
 
 // Unlike every other domain above (curated HA_ENTITIES map), automations and
@@ -169,6 +181,25 @@ export function mapLightEntity(entity: HAEntity): LightState {
   };
 }
 
+// Per-entity mapper, mirroring mapLightEntity — lets the WS handler patch a
+// single switch in place without recomputing every room. unavailable/unknown
+// reads as off + status "error" (unreachable), same red/error convention
+// used elsewhere rather than a separate enum.
+export function mapSwitchEntity(entity: HAEntity): SwitchState {
+  const isUnavailable = entity.state === "unavailable" || entity.state === "unknown";
+  return {
+    id: entity.entity_id,
+    device: ((entity.attributes.friendly_name as string) ?? entity.entity_id).trim(),
+    type: "switch",
+    isOn: !isUnavailable && entity.state === "on",
+    wattsNow: 0,
+    todayKwh: 0,
+    // Plain Kasa on/off switch — no power-monitoring sensor.
+    metered: false,
+    status: isUnavailable ? "error" : "idle",
+  };
+}
+
 function roomNameFromSlug(slug: string): string {
   return slug.split("_").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 }
@@ -188,28 +219,41 @@ export function computeRoomBrightness(lights: LightState[]): number {
 // real 19 light.* entities in HA — room prefixes are: bedroom, kitchen,
 // living_room, laundry, bathroom, front_door.
 //
-// SwitchState and per-room SensorState are deferred per CLAUDE.md — every
-// room comes back with switches: [] and sensors: [] until that data layer exists.
+// Switches are placed via the curated SWITCH_ROOM_OVERRIDE map (explicit,
+// not derived) — per-room SensorState is still deferred per CLAUDE.md, so
+// every room's sensors come back [] until that data layer exists.
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomLights = new Map<string, LightState[]>();
+  const roomSwitches = new Map<string, SwitchState[]>();
 
   for (const entity of Object.values(states)) {
-    if (!isLightEntity(entity.entity_id)) continue;
-    const [, objectId] = entity.entity_id.split(".");
-    const roomSlug = (entity.attributes.room as string) ?? objectId.split("_")[0];
-    const lights = roomLights.get(roomSlug) ?? [];
-    lights.push(mapLightEntity(entity));
-    roomLights.set(roomSlug, lights);
+    if (isLightEntity(entity.entity_id)) {
+      const [, objectId] = entity.entity_id.split(".");
+      const roomSlug = (entity.attributes.room as string) ?? objectId.split("_")[0];
+      const lights = roomLights.get(roomSlug) ?? [];
+      lights.push(mapLightEntity(entity));
+      roomLights.set(roomSlug, lights);
+    } else if (isSwitchEntity(entity.entity_id)) {
+      const roomSlug = SWITCH_ROOM_OVERRIDE[entity.entity_id];
+      if (!roomSlug) continue;
+      const switches = roomSwitches.get(roomSlug) ?? [];
+      switches.push(mapSwitchEntity(entity));
+      roomSwitches.set(roomSlug, switches);
+    }
   }
 
-  return Array.from(roomLights.entries()).map(([slug, lights]) => ({
-    id: slug,
-    name: roomNameFromSlug(slug),
-    lights,
-    switches: [],
-    sensors: [],
-    roomBrightness: computeRoomBrightness(lights),
-  }));
+  const roomSlugs = new Set([...roomLights.keys(), ...roomSwitches.keys()]);
+  return Array.from(roomSlugs).map((slug) => {
+    const lights = roomLights.get(slug) ?? [];
+    return {
+      id: slug,
+      name: roomNameFromSlug(slug),
+      lights,
+      switches: roomSwitches.get(slug) ?? [],
+      sensors: [],
+      roomBrightness: computeRoomBrightness(lights),
+    };
+  });
 }
 
 export function mapHAStatesToSolar(states: HAStateMap): SolarState {
