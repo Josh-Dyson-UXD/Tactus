@@ -19,8 +19,13 @@ import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
 import { AutomationsView } from "@/components/layout/AutomationsView";
 
-// Local-network-only: the token stays in this build's env and never leaves
-// the LAN. Set VITE_HA_URL / VITE_HA_TOKEN in .env.local (see .env.example).
+// Two supported modes (see README "Deployment"):
+//  - Direct-to-HA dev: set both VITE_HA_URL and VITE_HA_TOKEN in .env.local —
+//    inlined into this build's JS, fine for local iteration, never for
+//    anything reachable beyond your own machine.
+//  - Through the deployment proxy (server/): leave both unset. HAClient
+//    defaults its base URL to the page's own origin, and the proxy injects
+//    the real token server-side — this client never holds one.
 const HA_URL   = import.meta.env.VITE_HA_URL as string | undefined;
 const HA_TOKEN = import.meta.env.VITE_HA_TOKEN as string | undefined;
 
@@ -168,8 +173,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!HA_URL || !HA_TOKEN) {
-      setConnError("Missing VITE_HA_URL / VITE_HA_TOKEN — see .env.example");
+    // Only fatal when someone has opted into direct-to-HA dev mode
+    // (VITE_HA_URL set) without also giving it a token — that combination
+    // really can't authenticate, no proxy to inject one. When VITE_HA_URL is
+    // unset, HAClient defaults to the page's own origin and a missing token
+    // is expected: the deployment proxy holds the real one.
+    if (HA_URL && !HA_TOKEN) {
+      setConnError("VITE_HA_URL is set but VITE_HA_TOKEN is missing — see .env.example");
       return;
     }
 

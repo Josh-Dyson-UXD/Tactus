@@ -1,0 +1,8 @@
+services:
+  tactus:
+    build: .
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    env_file:
+      - .env

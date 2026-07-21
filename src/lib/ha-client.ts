@@ -30,15 +30,22 @@ export function mergeStates(cached: HAStateMap, fetched: HAStateMap): HAStateMap
   return merged;
 }
 
-export type HAConfig = { url: string; token: string };
+// url/token are both optional now that Tactus can run behind the deployment
+// proxy in server/ (see README "Deployment"): the proxy serves the app from
+// its own origin and injects the real token server-side, so the browser
+// never needs to hold either. Explicit values still work for the older
+// direct-to-HA dev flow.
+export type HAConfig = { url?: string; token?: string };
 
 type StateChangedListener = (entityId: string, entity: HAEntity) => void;
 type ConnectionListener = (connected: boolean) => void;
 type AuthErrorListener = (message: string) => void;
 
-// Local-network-only client: talks directly to Home Assistant's REST + WebSocket
-// API from the browser. No proxy — the long-lived token lives in this session's
-// env only and never leaves the LAN. See CLAUDE.md "Home Assistant integration".
+// Talks to Home Assistant's REST + WebSocket API — either directly (dev mode,
+// url/token explicit) or, in production, through the same-origin deployment
+// proxy in server/, which holds the real token so it never reaches this
+// client at all. See CLAUDE.md "Home Assistant integration" and the
+// README's "Deployment" section.
 export class HAClient {
   private config: HAConfig;
   private ws: WebSocket | null = null;
@@ -53,18 +60,21 @@ export class HAClient {
   }
 
   private get restBase() {
-    return this.config.url.replace(/\/$/, "");
+    const url = this.config.url ?? window.location.origin;
+    return url.replace(/\/$/, "");
   }
 
   private get wsUrl() {
     return this.restBase.replace(/^http/, "ws") + "/api/websocket";
   }
 
-  // Initial load: REST snapshot of every entity's current state.
+  // Initial load: REST snapshot of every entity's current state. Behind the
+  // proxy this Authorization header is discarded and replaced server-side —
+  // sending it (possibly empty) is harmless, not load-bearing.
   async fetchStates(): Promise<HAStateMap> {
     const res = await fetch(`${this.restBase}/api/states`, {
       headers: {
-        Authorization: `Bearer ${this.config.token}`,
+        Authorization: `Bearer ${this.config.token ?? ""}`,
         "Content-Type": "application/json",
       },
     });
@@ -84,7 +94,9 @@ export class HAClient {
       const msg = JSON.parse(ev.data);
       switch (msg.type) {
         case "auth_required":
-          ws.send(JSON.stringify({ type: "auth", access_token: this.config.token }));
+          // Behind the proxy this value is discarded and replaced with the
+          // real token server-side — sending it (possibly empty) is fine.
+          ws.send(JSON.stringify({ type: "auth", access_token: this.config.token ?? "" }));
           break;
         case "auth_ok":
           this.connectionListeners.forEach((l) => l(true));
