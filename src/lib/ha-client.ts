@@ -34,6 +34,7 @@ export type HAConfig = { url: string; token: string };
 
 type StateChangedListener = (entityId: string, entity: HAEntity) => void;
 type ConnectionListener = (connected: boolean) => void;
+type AuthErrorListener = (message: string) => void;
 
 // Local-network-only client: talks directly to Home Assistant's REST + WebSocket
 // API from the browser. No proxy — the long-lived token lives in this session's
@@ -45,6 +46,7 @@ export class HAClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private stateListeners = new Set<StateChangedListener>();
   private connectionListeners = new Set<ConnectionListener>();
+  private authErrorListeners = new Set<AuthErrorListener>();
 
   constructor(config: HAConfig) {
     this.config = config;
@@ -90,6 +92,7 @@ export class HAClient {
           break;
         case "auth_invalid":
           console.error("HA WebSocket auth failed:", msg.message);
+          this.authErrorListeners.forEach((l) => l(msg.message ?? "Home Assistant rejected the access token"));
           ws.close();
           break;
         case "event": {
@@ -137,5 +140,16 @@ export class HAClient {
   onConnectionChange(listener: ConnectionListener) {
     this.connectionListeners.add(listener);
     return () => this.connectionListeners.delete(listener);
+  }
+
+  // Fatal auth failure (invalid/revoked token) — distinct from a transient
+  // connection drop, which onConnectionChange(false) already covers and
+  // which self-heals via the reconnect timer. This won't self-heal without
+  // the token being fixed, so the caller needs an honest, specific message
+  // rather than an endless "Reconnecting…" loop with the real cause only in
+  // the console.
+  onAuthError(listener: AuthErrorListener) {
+    this.authErrorListeners.add(listener);
+    return () => this.authErrorListeners.delete(listener);
   }
 }

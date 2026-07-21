@@ -76,6 +76,20 @@ export default function App() {
   // just failed" (say so distinctly, don't wipe or relabel it "Reconnecting").
   const hydrationGenRef = useRef(0);
   const hasLoadedRef = useRef(false);
+  // Tracks the WS's live connected/disconnected state so a rehydrate fetch
+  // that was in flight when the WS dropped can't clear connError back to
+  // null on arrival — same shape of bug as the checkpoint-1 ordering issue,
+  // just one layer down: "this fetch succeeded" isn't the same event as
+  // "we're still connected right now".
+  const isConnectedRef = useRef(false);
+  // Set once a fatal auth_invalid arrives. ws.close() after auth_invalid
+  // synchronously triggers onConnectionChange(false) right behind it, which
+  // would otherwise overwrite the honest "token rejected" message with the
+  // generic "Reconnecting…" a moment later — wrong, since this won't
+  // self-heal via the reconnect timer the way a transient drop does. Cleared
+  // on the next successful auth, so a fixed token (after a rebuild/restart)
+  // recovers normally.
+  const authRejectedRef = useRef(false);
 
   // The one code path for both the initial load and every reconnect —
   // triggered below by onConnectionChange(true), which fires on every
@@ -127,18 +141,29 @@ export default function App() {
       hasLoadedRef.current = true;
       // The only place connError is ever cleared — a successful refresh is
       // the real "we're caught up" signal, not merely the WS reconnecting.
-      setConnError(null);
+      // But only if we're still actually connected: the WS can drop again
+      // while this fetch was in flight, and that disconnect's "Reconnecting…"
+      // must win over a fetch that started before it and lands after.
+      if (isConnectedRef.current) setConnError(null);
     } catch (err) {
       if (gen !== hydrationGenRef.current) return; // superseded — ignore its failure too
       const message = err instanceof Error ? err.message : String(err);
       console.error("Re-hydration fetch failed:", err);
       // No last-known data yet: nothing to preserve, so surface the real
-      // error instead of leaving the UI stuck on a silent "Connecting…".
-      // Once we do have data, don't claim "Reconnecting…" (untrue — the WS
-      // is back, only the refresh failed) and don't clear the error either;
-      // say so distinctly and let the WS's own reconnect timer retry on the
-      // next drop.
-      setConnError(hasLoadedRef.current ? "Reconnected — couldn't refresh state" : message);
+      // error instead of leaving the UI stuck on a silent "Connecting…",
+      // regardless of current connection state — there's nothing else to
+      // show. Once we do have data: if we've dropped again since this fetch
+      // was issued, the more recent disconnect's "Reconnecting…" already
+      // covers it and is the truer statement — don't overwrite it with a
+      // "Reconnected" message that's now false. Only if we're still
+      // actually connected does the distinct refresh-failed message apply
+      // (not "Reconnecting…", which would be untrue — the WS is back, only
+      // the refresh failed — and not silence either).
+      if (!hasLoadedRef.current) {
+        setConnError(message);
+      } else if (isConnectedRef.current) {
+        setConnError("Reconnected — couldn't refresh state");
+      }
     }
   }, []);
 
@@ -154,11 +179,27 @@ export default function App() {
     // Registered before connect() — hydration now hangs off this listener,
     // so it must already be attached before auth_ok can possibly fire.
     const unsubConn = client.onConnectionChange((connected) => {
+      isConnectedRef.current = connected;
       if (connected) {
+        authRejectedRef.current = false; // a fresh successful auth supersedes any prior rejection
         rehydrate(); // clears connError itself, only once the refresh actually succeeds
-      } else {
+      } else if (!authRejectedRef.current) {
+        // Don't overwrite an auth-rejected message with the generic one —
+        // ws.close() after auth_invalid fires this same event right behind
+        // onAuthError below, and "Reconnecting…" would be a downgrade to a
+        // less accurate, implicitly-self-healing-sounding message.
         setConnError("Reconnecting to Home Assistant…");
       }
+    });
+    // Fatal auth failure (invalid/revoked token) never reaches auth_ok, so
+    // it never fires onConnectionChange(true) and rehydrate() never runs —
+    // without this, the UI would loop "Reconnecting…" forever with the real
+    // cause only in the console. This won't self-heal via the reconnect
+    // timer the way a transient drop does, but the message still needs to
+    // be honest about what's actually wrong.
+    const unsubAuthError = client.onAuthError((message) => {
+      authRejectedRef.current = true;
+      setConnError(`Home Assistant rejected the access token: ${message}`);
     });
     const unsubState = client.onStateChanged((entityId, entity) => {
       statesRef.current = { ...statesRef.current, [entityId]: entity };
@@ -243,6 +284,7 @@ export default function App() {
 
     return () => {
       unsubConn();
+      unsubAuthError();
       unsubState();
       client.disconnect();
       lightPendingRef.current.forEach(clearTimeout);
