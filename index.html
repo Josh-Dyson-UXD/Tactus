@@ -4,12 +4,22 @@
     <head>
       
       <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Create Interactive Light Switch</title>
+      <!-- viewport-fit=cover + user-scalable=no: full-bleed under the Air 4's
+           rounded corners (env() safe-area insets below handle the actual
+           inset padding) and no pinch-zoom on a fixed wall panel. -->
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+      <title>Tactus</title>
       <meta name="description" content="Control your smart home lighting effortlessly with an interactive dashboard that features customizable light switch states for enhanced convenience." />
       <meta name="robots" content="noindex, nofollow" />
+      <!-- Safari-specific home-screen web app bits — confined here since
+           these are meta tags, not CSS, and won't carry over if this moves
+           to a dedicated kiosk browser app later. -->
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      <meta name="apple-mobile-web-app-title" content="Tactus" />
+      <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      
+
     </head>
 
     <body>

@@ -159,6 +159,42 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Wall-panel kiosk behaviour — plain CSS, not Safari-specific meta tags, so
+   this survives a later move to a dedicated kiosk browser app. The
+   Safari/PWA-only bits (apple-mobile-web-app-*, apple-touch-icon) live in
+   index.html instead.
+   ───────────────────────────────────────────────────────────────────────── */
+
+html, body {
+  /* No rubber-band/bounce scroll — this is a fixed wall panel, not a
+     scrollable document. Views that do need to scroll internally set their
+     own overflow explicitly; this only kills the outer document bounce. */
+  overscroll-behavior: none;
+}
+
+#root {
+  /* Safe-area insets via env() — the Air 4 has rounded corners (no notch),
+     but this is the correct general mechanism regardless of exact device
+     geometry, and applies uniformly to every view mounted under #root
+     rather than each view's own header re-deriving it. Additive to each
+     view's existing content padding, not a replacement for it. */
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+}
+
+body, #root, * {
+  /* No text selection, no long-press callout ("Copy"/"Look Up"/"Share…")
+     menu, no tap-highlight flash — all wrong for a touch control surface
+     that isn't a document. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Helper: alpha-blended accent glow, generated at runtime in JS today via
    withAlpha(hex, alpha) in App.tsx. Keep that helper — token values above
    are the canonical hex source it should read from, not re-hardcode.
