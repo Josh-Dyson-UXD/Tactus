@@ -60,7 +60,9 @@ export class HAClient {
   }
 
   private get restBase() {
-    const url = this.config.url ?? window.location.origin;
+    // || not ?? — an empty-string VITE_HA_URL (e.g. left as `VITE_HA_URL=`
+    // in .env.local) must fall back too, not survive as a truthy-looking "".
+    const url = this.config.url || window.location.origin;
     return url.replace(/\/$/, "");
   }
 

@@ -119,7 +119,18 @@ function serveStatic(req, res, pathname) {
         return;
       }
       const ext = path.extname(target);
-      res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" });
+      // Vite's hashed /assets/ filenames change per build, so those are safe
+      // to cache forever. Everything else — index.html above all — must
+      // revalidate on every load: on an iPad home-screen web app there's no
+      // easy way to force a refresh from a kiosked device, so a cached stale
+      // index.html would mean the panel keeps running an old bundle
+      // indefinitely after a rebuild.
+      const isHashedAsset = path.relative(DIST_DIR, target).startsWith(`assets${path.sep}`);
+      const cacheControl = isHashedAsset ? "public, max-age=31536000, immutable" : "no-cache";
+      res.writeHead(200, {
+        "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
+        "Cache-Control": cacheControl,
+      });
       res.end(data);
     });
   });
@@ -159,44 +170,51 @@ function handleClientSocket(client) {
   let upstreamOpen = false;
   const pendingToUpstream = [];
 
-  function forwardToUpstream(frame) {
-    if (upstreamOpen) upstream.send(frame);
-    else pendingToUpstream.push(frame);
+  // ws picks the wire opcode from the JS type passed to send() (string ->
+  // text, Buffer -> binary) unless overridden — and every "message" handler
+  // hands you a Buffer regardless of the original frame's real opcode. Every
+  // forward call here passes the ORIGINAL frame's isBinary explicitly via
+  // { binary }, so a text frame stays text and a binary frame stays binary
+  // in both directions — never inferred from the Buffer wrapper.
+  function forwardToUpstream(frame, isBinary) {
+    if (upstreamOpen) upstream.send(frame, { binary: isBinary });
+    else pendingToUpstream.push({ frame, isBinary });
   }
 
   upstream.on("open", () => {
     upstreamOpen = true;
-    for (const frame of pendingToUpstream) upstream.send(frame);
+    for (const { frame, isBinary } of pendingToUpstream) upstream.send(frame, { binary: isBinary });
     pendingToUpstream.length = 0;
   });
 
   client.on("message", (data, isBinary) => {
     if (isBinary) {
-      forwardToUpstream(data);
+      forwardToUpstream(data, true);
       return;
     }
     let msg;
     try {
       msg = JSON.parse(data.toString());
     } catch {
-      // Not JSON — forward unchanged rather than guess or drop it.
-      forwardToUpstream(data);
+      // Not JSON — forward unchanged (still text) rather than guess or drop it.
+      forwardToUpstream(data, false);
       return;
     }
     if (msg.type === "auth") {
       // Always substituted, regardless of what the client sent (or didn't) —
       // the browser no longer holds a real token, so its value here is
       // irrelevant. Never log `msg` itself past this point, only the type.
+      // Reconstructed as JSON, always a text frame.
       msg.access_token = HA_TOKEN;
-      forwardToUpstream(JSON.stringify(msg));
+      forwardToUpstream(JSON.stringify(msg), false);
       console.log("[ws] auth frame forwarded (token substituted)");
       return;
     }
-    forwardToUpstream(data);
+    forwardToUpstream(data, false);
   });
 
-  upstream.on("message", (data) => {
-    if (client.readyState === WebSocket.OPEN) client.send(data);
+  upstream.on("message", (data, isBinary) => {
+    if (client.readyState === WebSocket.OPEN) client.send(data, { binary: isBinary });
   });
 
   const closeBoth = () => {
