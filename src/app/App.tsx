@@ -5,7 +5,7 @@ import type {
   ControlStatus, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
   AutomationState, SceneState, MainView,
 } from "@/types";
-import { HAClient } from "@/lib/ha-client";
+import { HAClient, mergeStates } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
@@ -68,6 +68,80 @@ export default function App() {
   const automationPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const switchPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
+  // Guards for rehydrate() below. hydrationGenRef lets a slower, now-
+  // superseded rehydrate (e.g. two WS auth_oks in quick succession) detect
+  // that a newer one already landed and no-op instead of overwriting fresher
+  // data with older. hasLoadedRef distinguishes "never loaded anything yet"
+  // (surface the real fetch error) from "have last-known data, this refresh
+  // just failed" (say so distinctly, don't wipe or relabel it "Reconnecting").
+  const hydrationGenRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+
+  // The one code path for both the initial load and every reconnect —
+  // triggered below by onConnectionChange(true), which fires on every
+  // successful auth_ok, not just the first. Re-fetches the full REST
+  // snapshot, merges it into statesRef (never replaces it wholesale, so a
+  // state_changed event that raced in ahead of this response isn't lost),
+  // and re-derives every domain from the merged map.
+  const rehydrate = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client) return;
+    const gen = ++hydrationGenRef.current;
+
+    try {
+      const fetched = await client.fetchStates();
+      if (gen !== hydrationGenRef.current) return; // superseded — a newer rehydrate already won
+
+      const merged = mergeStates(statesRef.current, fetched);
+      statesRef.current = merged;
+
+      // This rehydration is the authoritative resolution for anything
+      // mid-flight — clear every outstanding pending timer so none of them
+      // fire later and stomp a value the fresh snapshot already confirmed.
+      // Lights/switches/automations need nothing beyond that: their mappers
+      // derive state purely from entity data, never from a carried-over
+      // pending flag, so the wholesale recompute below already discards it.
+      // Tesla's pending lives in separate teslaControl state and needs an
+      // explicit reset.
+      lightPendingRef.current.forEach(clearTimeout);
+      lightPendingRef.current.clear();
+      switchPendingRef.current.forEach(clearTimeout);
+      switchPendingRef.current.clear();
+      automationPendingRef.current.forEach(clearTimeout);
+      automationPendingRef.current.clear();
+      teslaPendingRef.current.forEach(clearTimeout);
+      teslaPendingRef.current.clear();
+      setTeslaControl(IDLE_TESLA_CONTROL);
+
+      setRooms(mapHAStatesToRooms(merged));
+      setSolar(mapHAStatesToSolar(merged));
+      setPowerwall(mapHAStatesToPowerwall(merged));
+      setGrid(mapHAStatesToGrid(merged));
+      setTesla(mapHAStatesToTesla(merged));
+      setOutdoor(mapHAStatesToOutdoor(merged));
+      setHomeLoad(mapHAStatesToHomeLoad(merged));
+      setIndoor(mapHAStatesToIndoor(merged));
+      setAutomations(mapHAStatesToAutomations(merged));
+      setScenes(mapHAStatesToScenes(merged));
+
+      hasLoadedRef.current = true;
+      // The only place connError is ever cleared — a successful refresh is
+      // the real "we're caught up" signal, not merely the WS reconnecting.
+      setConnError(null);
+    } catch (err) {
+      if (gen !== hydrationGenRef.current) return; // superseded — ignore its failure too
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("Re-hydration fetch failed:", err);
+      // No last-known data yet: nothing to preserve, so surface the real
+      // error instead of leaving the UI stuck on a silent "Connecting…".
+      // Once we do have data, don't claim "Reconnecting…" (untrue — the WS
+      // is back, only the refresh failed) and don't clear the error either;
+      // say so distinctly and let the WS's own reconnect timer retry on the
+      // next drop.
+      setConnError(hasLoadedRef.current ? "Reconnected — couldn't refresh state" : message);
+    }
+  }, []);
+
   useEffect(() => {
     if (!HA_URL || !HA_TOKEN) {
       setConnError("Missing VITE_HA_URL / VITE_HA_TOKEN — see .env.example");
@@ -77,24 +151,15 @@ export default function App() {
     const client = new HAClient({ url: HA_URL, token: HA_TOKEN });
     clientRef.current = client;
 
-    client.fetchStates()
-      .then((states) => {
-        statesRef.current = states;
-        setRooms(mapHAStatesToRooms(states));
-        setSolar(mapHAStatesToSolar(states));
-        setPowerwall(mapHAStatesToPowerwall(states));
-        setGrid(mapHAStatesToGrid(states));
-        setTesla(mapHAStatesToTesla(states));
-        setOutdoor(mapHAStatesToOutdoor(states));
-        setHomeLoad(mapHAStatesToHomeLoad(states));
-        setIndoor(mapHAStatesToIndoor(states));
-        setAutomations(mapHAStatesToAutomations(states));
-        setScenes(mapHAStatesToScenes(states));
-      })
-      .catch((err) => setConnError(err instanceof Error ? err.message : String(err)));
-
-    client.connect();
-    const unsubConn  = client.onConnectionChange((connected) => setConnError(connected ? null : "Reconnecting to Home Assistant…"));
+    // Registered before connect() — hydration now hangs off this listener,
+    // so it must already be attached before auth_ok can possibly fire.
+    const unsubConn = client.onConnectionChange((connected) => {
+      if (connected) {
+        rehydrate(); // clears connError itself, only once the refresh actually succeeds
+      } else {
+        setConnError("Reconnecting to Home Assistant…");
+      }
+    });
     const unsubState = client.onStateChanged((entityId, entity) => {
       statesRef.current = { ...statesRef.current, [entityId]: entity };
       const states = statesRef.current;
@@ -174,6 +239,8 @@ export default function App() {
       }
     });
 
+    client.connect();
+
     return () => {
       unsubConn();
       unsubState();
@@ -187,7 +254,7 @@ export default function App() {
       switchPendingRef.current.forEach(clearTimeout);
       switchPendingRef.current.clear();
     };
-  }, []);
+  }, [rehydrate]);
 
   // ─── Light control: pending → confirmed cycle ────────────────────────────
   const setLightCardState = useCallback((entityId: string, cardState: "pending" | "error") => {

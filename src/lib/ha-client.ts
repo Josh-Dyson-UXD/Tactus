@@ -8,6 +8,28 @@ export type HAEntity = {
 
 export type HAStateMap = Record<string, HAEntity>;
 
+// Merge a freshly-fetched REST snapshot into a cached state map without
+// letting a stale fetched value beat a fresher one already in the cache — a
+// state_changed event can land (and get merged into the cache directly) at
+// any point between a fetch being issued and its response arriving. Compares
+// last_updated per entity; strict > only, cached wins ties, since HA reports
+// microsecond precision that Date.parse truncates to milliseconds — a real
+// event 0.x ms newer than the snapshot can otherwise compare equal, and >=
+// would let the stale snapshot value win that tie. If either timestamp is
+// unparseable, keep the cached entity rather than guess.
+export function mergeStates(cached: HAStateMap, fetched: HAStateMap): HAStateMap {
+  const merged = { ...cached };
+  for (const [id, entity] of Object.entries(fetched)) {
+    const existing = merged[id];
+    if (!existing) { merged[id] = entity; continue; }
+    const fetchedTime = Date.parse(entity.last_updated);
+    const existingTime = Date.parse(existing.last_updated);
+    if (Number.isNaN(fetchedTime) || Number.isNaN(existingTime)) continue;
+    if (fetchedTime > existingTime) merged[id] = entity;
+  }
+  return merged;
+}
+
 export type HAConfig = { url: string; token: string };
 
 type StateChangedListener = (entityId: string, entity: HAEntity) => void;
