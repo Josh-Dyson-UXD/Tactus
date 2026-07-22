@@ -1,25 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { Zap } from "lucide-react";
-import type { Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, IndoorState, ControlStatus, TeslaControlKey, TeslaActions } from "@/types";
+import { Zap, Gauge } from "lucide-react";
+import type { Room, OutdoorState, IndoorState } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { computeRoomBrightness } from "@/lib/ha-types";
 import { RoomControls } from "@/components/controls/RoomControls";
 import { EnvironmentBar } from "@/components/layout/EnvironmentBar";
 import { SectionHeading } from "@/components/layout/SectionHeading";
-import { SolarCard } from "@/components/cards/SolarCard";
-import { PowerwallCard } from "@/components/cards/PowerwallCard";
-import { TeslaCard } from "@/components/cards/TeslaCard";
-import { EnergyFlowCard } from "@/components/cards/EnergyFlowCard";
 import { RoomCard } from "@/components/cards/RoomCard";
 
 const COMMIT_DELAY = 400;
 
-export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeLoad, indoor, onNavigate, onOpenAutomations, teslaControl, teslaActions, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
-  rooms: Room[]; solar: SolarState; powerwall: PowerwallState; grid: GridState; tesla: TeslaState; outdoor: OutdoorState; homeLoad: HomeLoadState; indoor: IndoorState;
+export function HouseView({ rooms, outdoor, indoor, onNavigate, onOpenAutomations, onOpenEnergy, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
+  rooms: Room[]; outdoor: OutdoorState; indoor: IndoorState;
   onNavigate: (id: string) => void;
   onOpenAutomations: () => void;
-  teslaControl: Record<TeslaControlKey, ControlStatus>;
-  teslaActions: TeslaActions;
+  onOpenEnergy: () => void;
   onRoomToggle: (room: Room, on: boolean) => void;
   onRoomBrightness: (room: Room, v: number) => void;
   onHouseToggle: (on: boolean) => void;
@@ -57,6 +52,9 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeL
             <p className="text-[13px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{totalActive} of {totalDevices} devices active</p>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={onOpenEnergy} title="Energy" className="flex items-center justify-center size-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "var(--tactus-bg-overlay)", border: "1px solid var(--tactus-border-overlay)" }}>
+              <Gauge size={16} color="var(--tactus-text-secondary)" />
+            </button>
             <button onClick={onOpenAutomations} title="Automations & Scenes" className="flex items-center justify-center size-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "var(--tactus-bg-overlay)", border: "1px solid var(--tactus-border-overlay)" }}>
               <Zap size={16} color="var(--tactus-text-secondary)" />
             </button>
@@ -69,18 +67,6 @@ export function HouseView({ rooms, solar, powerwall, grid, tesla, outdoor, homeL
 
       <div className="p-8 flex flex-col gap-10">
         <EnvironmentBar rooms={rooms} indoor={indoor} outdoor={outdoor} />
-
-        <div>
-          <SectionHeading label="Energy" />
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
-            <SolarCard solar={solar} />
-            <PowerwallCard powerwall={powerwall} grid={grid} />
-            <TeslaCard tesla={tesla} control={teslaControl} actions={teslaActions} />
-          </div>
-          <div className="mt-4">
-            <EnergyFlowCard solar={solar} powerwall={powerwall} grid={grid} homeLoad={homeLoad} tesla={tesla} />
-          </div>
-        </div>
 
         <div>
           <SectionHeading label="Rooms" count={rooms.length} />

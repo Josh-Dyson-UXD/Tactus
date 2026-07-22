@@ -149,8 +149,10 @@ export type SceneState = {
 // Top-level app view. Deliberately separate from LightState's `Panel` (that's
 // a light card's own internal summary/brightness/color sub-navigation, a
 // different concept). "automations" also holds the Scenes section — kept as
-// one view rather than splitting nav further, per the brief.
-export type MainView = "house" | "automations";
+// one view rather than splitting nav further, per the brief. "energy" holds
+// Solar/Powerwall/Tesla/EnergyFlow — split out of the house view because it
+// and the Rooms grid together overflowed 1180x820 on the wall-panel target.
+export type MainView = "house" | "automations" | "energy";
 
 // ─── Room ─────────────────────────────────────────────────────────────────────
 

@@ -18,6 +18,7 @@ import {
 import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
 import { AutomationsView } from "@/components/layout/AutomationsView";
+import { EnergyView } from "@/components/layout/EnergyView";
 
 // Two supported modes (see README "Deployment"):
 //  - Direct-to-HA dev: set both VITE_HA_URL and VITE_HA_TOKEN in .env.local —
@@ -56,12 +57,15 @@ export default function App() {
   const [scenes, setScenes]           = useState<SceneState[]>([]);
 
   // Single source of truth for top-level nav — house/room world vs. the
-  // automations & scenes panel. selectedRoomId only means anything while
-  // mainView === "house"; entering "automations" clears it so "back" always
-  // lands on the house grid, never a stale room.
+  // automations & scenes panel vs. the energy detail panel. selectedRoomId
+  // only means anything while mainView === "house"; entering "automations"
+  // or "energy" clears it so "back" always lands on the house grid, never a
+  // stale room.
   const [mainView, setMainView] = useState<MainView>("house");
   const openAutomations  = useCallback(() => { setRoomId(null); setMainView("automations"); }, []);
   const closeAutomations = useCallback(() => setMainView("house"), []);
+  const openEnergy  = useCallback(() => { setRoomId(null); setMainView("energy"); }, []);
+  const closeEnergy = useCallback(() => setMainView("house"), []);
 
   // Full snapshot kept locally so aggregate cards (solar/powerwall/grid/
   // tesla/outdoor, each backed by several entities) can be recomputed from
@@ -549,6 +553,22 @@ export default function App() {
     );
   }
 
+  if (mainView === "energy") {
+    return (
+      <EnergyView solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} homeLoad={homeLoad} onBack={closeEnergy}
+        teslaControl={teslaControl}
+        teslaActions={{
+          toggleClimate: handleToggleTeslaClimate, toggleLock: handleToggleTeslaLock,
+          toggleSentry: handleToggleTeslaSentry, toggleValet: handleToggleTeslaValet,
+          setSeatHeaterFL: handleTeslaSeatHeaterFL, setSeatHeaterFR: handleTeslaSeatHeaterFR,
+          setSteeringWheelHeater: handleTeslaSteeringWheelHeater,
+          setClimatePreset: handleTeslaClimatePreset, setClimateFanMode: handleTeslaClimateFanMode,
+          openFrunk: handleTeslaOpenFrunk, toggleTrunk: handleToggleTeslaTrunk, toggleWindows: handleToggleTeslaWindows,
+          honk: handleTeslaHonk, flash: handleTeslaFlash,
+        }} />
+    );
+  }
+
   return (
     <AnimatePresence mode="wait">
       {selectedRoom ? (
@@ -559,19 +579,10 @@ export default function App() {
         </motion.div>
       ) : (
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
-          <HouseView rooms={rooms} solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} outdoor={outdoor} homeLoad={homeLoad} indoor={indoor}
+          <HouseView rooms={rooms} outdoor={outdoor} indoor={indoor}
             onNavigate={setRoomId}
             onOpenAutomations={openAutomations}
-            teslaControl={teslaControl}
-            teslaActions={{
-              toggleClimate: handleToggleTeslaClimate, toggleLock: handleToggleTeslaLock,
-              toggleSentry: handleToggleTeslaSentry, toggleValet: handleToggleTeslaValet,
-              setSeatHeaterFL: handleTeslaSeatHeaterFL, setSeatHeaterFR: handleTeslaSeatHeaterFR,
-              setSteeringWheelHeater: handleTeslaSteeringWheelHeater,
-              setClimatePreset: handleTeslaClimatePreset, setClimateFanMode: handleTeslaClimateFanMode,
-              openFrunk: handleTeslaOpenFrunk, toggleTrunk: handleToggleTeslaTrunk, toggleWindows: handleToggleTeslaWindows,
-              honk: handleTeslaHonk, flash: handleTeslaFlash,
-            }}
+            onOpenEnergy={openEnergy}
             onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness}
             onHouseToggle={handleHouseToggle} onHouseBrightness={handleHouseBrightness} />
         </motion.div>
