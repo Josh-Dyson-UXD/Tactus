@@ -1,6 +1,6 @@
 import { Thermometer, Droplets, Wind, Activity } from "lucide-react";
-import type { SensorState, TempSensor, HumidSensor, AQISensor } from "@/types";
-import { withAlpha, aqiLabel, humidLabel } from "@/lib/helpers";
+import type { SensorState, TempSensor, HumidSensor, AQISensor, CO2Sensor } from "@/types";
+import { withAlpha, aqiLabel, humidLabel, co2Label } from "@/lib/helpers";
 
 export function SensorCard({ state }: { state: SensorState }) {
   const { device, data } = state;
@@ -92,6 +92,23 @@ export function SensorCard({ state }: { state: SensorState }) {
               <p className="text-[13px] font-semibold" style={{ fontFamily: "var(--tactus-font-mono)", color: "var(--tactus-text-secondary)" }}>{data.pm25} <span style={{ color: "var(--tactus-text-muted)", fontSize: 11 }}>µg/m³</span></p>
             </div>
           </div>
+        </>
+      );
+    }
+    if (data.kind === "co2") {
+      const { label, color } = co2Label(data.co2);
+      return (
+        <>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center justify-center rounded-tactus-sm size-[36px]" style={{ background: withAlpha(color, 0.1) }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color }}>CO₂</span>
+            </div>
+            <p className="text-[14px] font-semibold" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)" }}>{device}</p>
+          </div>
+          <p style={{ fontFamily: "var(--tactus-font-mono)", color, fontSize: 48, fontWeight: 600, lineHeight: 1 }}>
+            {data.co2}<span style={{ fontSize: 20, color: "var(--tactus-text-muted)" }}> ppm</span>
+          </p>
+          <p className="mt-2 text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{label}</p>
         </>
       );
     }
