@@ -1,99 +1,108 @@
 # Tactus — Smart Home Dashboard
 
-This file is the build spec. Read it before touching code. It defines what
-exists, what doesn't yet, and the rules that keep the system coherent as it
-grows from a Figma Make prototype into a real app wired to Home Assistant.
+This file is the living build spec. Read it before touching code. It defines
+what exists, what doesn't yet, and the rules that keep the system coherent as
+it continues to evolve. The original build (Figma prototype → real app wired
+to Home Assistant → deployed wall panel) is complete; this file now tracks an
+already-shipped system, not a from-scratch build.
 
 ## What this project is
 
 A custom smart-home control dashboard, design system: **Tactus**. Calm and
 ambient at rest, tactile and physical on interaction. Primary surface is a
-wall-mounted landscape tablet; a phone layout is a planned sibling.
+wall-mounted landscape tablet — as of this writing, a real iPad Air 4th Gen
+running the real thing. A phone layout remains a planned sibling, not started.
 
 Origin: visual design was built in Figma Make and exported as React/Tailwind
-(the `src/app/App.tsx` + `src/imports/DashboardCanvas` files). That export is
-the **visual source of truth** — do not redesign it. Your job is to make it
-real: extract it into a proper system, then connect it to live data.
+(the `src/app/App.tsx` + `src/imports/DashboardCanvas` files). That export was
+the **visual source of truth** and still is for anything not explicitly
+changed since — do not redesign existing cards/layout without a deliberate,
+flagged decision (see "Design rules" and the Energy-view precedent below).
 
-## Current state (as of handoff)
+## Current state (production, live)
 
-- Single 1,100-line `src/app/App.tsx` containing all components, types, and
-  hardcoded `INITIAL_*` mock state. No live data. No HA connection.
-- Visual design is good and should be preserved exactly — colours, radii,
-  spacing, motion timings, layout.
-- All design values were inline hex/px literals in JSX. A token layer has
-  been extracted into `src/styles/theme.css` (see below) — **this replaces
-  the stock shadcn `theme.css` that Figma Make generates by default.**
+- Fully componentized (see "Target file structure"). No more monolithic
+  `App.tsx` — it's now ~460 lines of orchestration only: HA connection
+  lifecycle, pending/confirmed control state, and view routing.
+- **Live Home Assistant data end to end.** No mock state anywhere in the
+  shipped app. Real entities: 19 DIRIGERA lights across 6 rooms
+  (bedroom/kitchen/living_room/laundry/bathroom/front_door), Tesla ("Ghost",
+  a Model 3 Highland) with full quick-actions, Solar/Powerwall/Grid, one
+  curated switch (a Kasa-style plug), automations & scenes (dynamically
+  discovered, not curated), and a two-sensor indoor reading.
+- **Reconnect-safe.** On any WebSocket drop (HA restart, network blip), the
+  app re-fetches full state on reconnect and merges it in rather than trusting
+  stale cached values — see `mergeStates`/`rehydrate` in `App.tsx`/
+  `ha-client.ts`. This was a real bug (fixed post-launch) that let the UI go
+  silently stale indefinitely on an always-on panel; don't regress it.
+- **Deployed.** Runs in Docker on the Mac mini behind a purpose-built proxy
+  that hides the long-lived HA token from the browser entirely (see
+  "Deployment" below) — this is not the naive dev setup, don't revert to it.
+- **On the wall.** iPad Air 4, Safari, added to home screen, Guided Access
+  (not Single App Mode — see "Open questions").
 - Fonts: **Instrument Sans** (UI/labels) + **Geist Mono** (live numerals/
-  data). This was a deliberate choice — keep it, do not swap to DM Sans.
-- Data modelling is already correct and should be kept: `LightState`,
-  `SwitchState`, `SensorState` (discriminated union: motion/temp/humidity/
-  aqi), `SolarState`, `PowerwallState`, `GridState`, `TeslaState`, `Room`.
-  These map directly onto Home Assistant entities later — don't redesign
-  the shape, just change where the values come from.
+  data) — unchanged, still deliberate, don't swap.
+- Data modelling unchanged in shape from the original design import:
+  `LightState`, `SwitchState`, `SensorState`, `SolarState`, `PowerwallState`,
+  `GridState`, `TeslaState`, `Room`, plus newer additions `AutomationState`,
+  `SceneState`, `IndoorState`, `HomeLoadState`.
 
-## Build order (do these in sequence, don't skip ahead)
+## Build order (historical — all steps below are done)
 
-1. **Extract tokens.** Replace `src/styles/theme.css` with the Tactus token
-   file provided. Go through `App.tsx` and replace every hardcoded hex/px
-   value with the matching token (e.g. `#0b0c10` → `var(--tactus-bg-base)`
-   or the Tailwind utility `bg-tactus-bg-base`). No raw hex left in JSX
-   except inside the `COLORS` array (those are user-facing light-colour
-   choices, not system tokens) and the `withAlpha()` glow helper, which
-   reads token hex values at runtime — that's correct, leave it.
+1. ✅ **Tokens extracted** — `src/styles/theme.css`, no raw hex left in
+   components (only inside `COLORS` and `withAlpha()`, both correct by design).
+2. ✅ **Componentized** — see file structure below.
+3. ✅ **HA data layer built** — `src/lib/ha-client.ts` (WebSocket + REST) and
+   `src/lib/ha-types.ts` (entity ↔ Tactus-type adapter, per-entity mappers for
+   incremental WS updates).
+4. ✅ **Controls wired to real HA service calls** — pending → confirmed cycle
+   generalized across lights, switches, Tesla (12 separate control keys),
+   automations. Room/house-level bulk actions fan out to per-entity calls
+   rather than having their own pending state.
+5. ✅ **Deployed** — not Vercel (that plan was superseded early: this is
+   local-network-only by design, no public exposure). Docker container on the
+   Mac mini, token-hiding reverse proxy, iPad kiosk via Safari. See
+   "Deployment" below for the real architecture.
 
-2. **Split the component inventory.** Break `App.tsx` into the structure
-   below. Keep every component's logic and styling identical — this is a
-   refactor, not a rewrite.
+Anything past this is genuinely new work, not resuming an old plan — treat
+each addition as its own scoped task with the same checkpoint discipline used
+throughout (see "Working with Claude Code" below).
 
-3. **Build the Home Assistant data layer.** Replace `INITIAL_SOLAR`,
-   `INITIAL_POWERWALL`, `INITIAL_GRID`, `INITIAL_TESLA`, `INITIAL_ROOMS`,
-   `INITIAL_OUTDOOR` with live values from HA. See "Home Assistant
-   integration" below.
-
-4. **Wire controls to HA service calls.** Toggling a `LightCard`, dragging
-   `BrightnessSlider`, picking a colour — these currently only mutate local
-   React state. They need to call HA services and reflect the *pending →
-   confirmed* cycle (see Microinteraction rules below) rather than
-   optimistically flipping state instantly.
-
-5. **Deploy.** Vercel, same pattern as Aire/WorkBoard.
-
-## Target file structure
+## Target file structure (current, real)
 
 ```
 src/
   app/
-    App.tsx                 # shell, routing between HouseView/RoomView only
+    App.tsx                 # HA connection lifecycle, control state, view routing
   components/
     cards/
-      LightCard.tsx
-      SwitchCard.tsx
-      SensorCard.tsx
-      SolarCard.tsx
-      PowerwallCard.tsx
-      TeslaCard.tsx
-      RoomCard.tsx
+      LightCard.tsx / SwitchCard.tsx / SensorCard.tsx (stubbed, unused)
+      SolarCard.tsx / PowerwallCard.tsx / TeslaCard.tsx / EnergyFlowCard.tsx
+      RoomCard.tsx / AutomationCard.tsx / SceneCard.tsx
     controls/
-      BrightnessSlider.tsx
-      RoomControls.tsx
+      BrightnessSlider.tsx / ColorTempSlider.tsx / RoomControls.tsx
     layout/
-      HouseView.tsx
+      HouseView.tsx          # rooms grid + nav to Energy/Automations
       RoomView.tsx
-      EnvironmentBar.tsx
-      SectionHeading.tsx
-    icons/                   # LightbulbIcon, SunIcon, WifiOffIcon, AlertIcon, ChevronLeft
+      EnergyView.tsx          # Solar/Powerwall/Tesla/EnergyFlow, behind nav
+      AutomationsView.tsx     # automations + scenes, behind nav
+      EnvironmentBar.tsx / SectionHeading.tsx
+    icons/
   lib/
-    ha-client.ts             # WebSocket + REST client (see below)
-    ha-types.ts              # mapping between HA entity shapes and Room/LightState/etc.
-    helpers.ts                # withAlpha, dominantColor, aqiLabel, humidLabel
+    ha-client.ts             # WebSocket + REST client, mergeStates(), auth-error signal
+    ha-types.ts               # HA entity ↔ Tactus-type mapping, HA_ENTITIES map
+    helpers.ts
   types/
-    index.ts                 # Color, CardState, Panel, LightState, SwitchState,
-                              # SensorState + payloads, SolarState, PowerwallState,
-                              # GridState, OutdoorState, TeslaState, Room
+    index.ts                 # includes MainView: "house" | "automations" | "energy"
   styles/
-    theme.css                 # Tactus tokens (provided separately)
-    globals.css / tailwind.css / fonts.css  # unchanged
+    theme.css                 # Tactus tokens, plus kiosk shell rules (safe-area,
+                              # touch-behavior suppression) appended for iPad
+server/
+  index.js                   # deployment proxy — see "Deployment"
+  package.json                # single dependency: ws
+Dockerfile                    # multi-stage: vite build -> node runtime
+docker-compose.yml
+.env.example / .env (gitignored)
 ```
 
 ## Home Assistant integration
@@ -102,102 +111,256 @@ src/
 HA integrations → physical devices. Tactus never talks to Tesla, IKEA
 DIRIGERA, or Nest directly — HA normalises everything into entities.
 
-- **Auth:** long-lived access token from the HA user profile. Store as an
-  env var, never commit it. The token grants full HA control — treat it
-  like a password.
-- **Initial load:** REST API (`GET /api/states`) for first paint, mapped
-  into the `Room[]` / `SolarState` / etc. shapes already defined in types.
-- **Live updates:** WebSocket subscription to `state_changed` events for
-  every entity referenced on screen. Update only the changed entity's
-  slice of state, don't re-fetch everything.
-- **Control:** WebSocket `call_service` for actions — `light.turn_on`,
-  `switch.toggle`, `climate.set_temperature`, etc. Optimistic UI is fine for
-  the toggle press itself, but the **pending state must hold until HA
-  confirms** the entity actually changed, then resolve to the confirmed
-  value — not just whatever the user requested. If a command times out or
-  the device doesn't update, show the existing error/unreachable state on
-  the card, not a silent failure.
-- **Entity mapping (confirmed from HA Developer Tools → States, 2026-07-10):**
-  - `sensor.home_solar_power` (instantaneous kW) + `sensor.home_solar_generated`
-    (today's kWh) → `SolarState`. Status: "generating" if `generatingKw > 0`,
-    else "idle".
+- **Auth in production:** the browser build holds NO token. A server-side
+  proxy (see "Deployment") injects it. `VITE_HA_TOKEN` inlined into a client
+  bundle is a **dev-only** pattern now — never do this for anything actually
+  reachable beyond your own machine.
+- **Initial load + reconnect:** `HAClient.fetchStates()` (REST) is the single
+  code path for both first paint and every reconnect, triggered off
+  `onConnectionChange(true)` — not just on mount. Merges into cached state via
+  `mergeStates()` (strict `last_updated` comparison, cached wins ties) so a
+  `state_changed` event that races ahead of a fetch response is never
+  clobbered by stale fetched data.
+- **Live updates:** WebSocket subscription to `state_changed` for every
+  entity (not a curated subscribe_entities list — see "Known constraints").
+- **Control:** WebSocket `call_service`. Pending state holds until HA confirms
+  via `state_changed`, or a 7s timeout resolves to an error/unreachable state.
+  Generalized across every domain via per-entity pending-timer maps in
+  `App.tsx` — don't hardcode a new special case if it fits this pattern.
+- **Entity mapping** (confirmed from HA Developer Tools → States; dates below
+  are when each was actually verified against real hardware, not assumed):
+  - `sensor.home_solar_power` (kW) + `sensor.home_solar_generated` (kWh
+    today) → `SolarState`. Status "generating" if `generatingKw > 0.05`.
   - `sensor.home_percentage_charged` → `PowerwallState.pct`.
-    `sensor.home_battery_power` → `flowKw` (confirm sign convention when
-    wiring up — TBD whether positive means charging or discharging).
-    `number.home_backup_reserve` → `reservePct`. Status derived from sign of
-    battery power plus `binary_sensor.home_grid_status` /
-    `sensor.home_island_status` for backup/island detection.
-  - `sensor.home_grid_power` (instantaneous, signed) → split by sign into
-    `GridState.importKw` / `exportKw`. (`sensor.home_grid_imported` /
-    `home_grid_exported` are cumulative today-kWh totals — a different
-    metric, not live flow.)
-  - Tesla ("Ghost" in HA) → `TeslaState`: `sensor.ghost_battery_level` →
-    `batteryPct`; `sensor.ghost_estimate_battery_range` → `rangeKm` (already
-    metric); `lock.ghost_lock` → `locked`; `climate.ghost_climate` →
-    `climateOn`; `sensor.ghost_inside_temperature` → `tempC`;
-    `sensor.ghost_charger_power` → `chargingKw`; status derived from
-    `sensor.ghost_charging` + `device_tracker.ghost_location`. Model name
-    isn't exposed as an entity — hardcode "Model Y".
-  - DIRIGERA → `LightState`: 19 confirmed `light.*` entities, grouped by area
-    prefix (`bedroom_`, `kitchen_`, `living_room_`, `laundry_`, `bathroom_`,
-    `front_door_`). Maps directly onto the existing `Room[]` structure.
-  - `weather.forecast_home` → `OutdoorState` (temperature, humidity). No
-    AQI/PM2.5 source currently — omit those fields or leave blank until an
-    AQI sensor exists.
+    `sensor.home_battery_power` → `flowKw`. **Sign convention confirmed
+    2026-07-12 against real hardware: negative = charging, positive =
+    discharging** — the opposite of the original assumption. Don't flip it
+    back without re-confirming.
+  - `sensor.home_grid_power` → split by sign into `GridState.importKw`/
+    `exportKw`. **Sign convention still UNCONFIRMED against real export
+    behaviour** — this is the one entity mapping that was never actually
+    verified live, unlike Powerwall. Check next time the house is exporting:
+    does the Energy Flow card's export arrow match reality? One-line fix in
+    `mapHAStatesToGrid` if it needs flipping.
+  - Tesla ("Ghost", confirmed **Model 3 Highland**, hardcoded — not an HA
+    entity) → full `TeslaState` including quick-actions confirmed 2026-07-12:
+    `lock.ghost_lock`, `climate.ghost_climate` (backs on/off + preset + fan
+    mode — three `TeslaControlKey`s off one entity), `switch.ghost_sentry_mode`,
+    `switch.ghost_valet_mode`, seat/steering-wheel heater `select.*` entities,
+    `cover.ghost_frunk` (open-only, no close service exists),
+    `cover.ghost_trunk`, `cover.ghost_windows`, `button.ghost_honk_horn`,
+    `button.ghost_flash_lights`.
+  - DIRIGERA → `LightState`: 19 `light.*` entities, room derived from
+    `entity_id.split("_")[0]` when no `attributes.room` — this is a landmine,
+    see "Known constraints".
+  - One curated switch: `switch.kids_room_usb_lamp` — physically a Living
+    Room lamp despite its entity_id/HA area; placed via `SWITCH_ROOM_OVERRIDE`
+    in `ha-types.ts`, not derived. Only entry so far.
+  - **Automations & scenes are dynamically discovered**, not a curated list —
+    anything matching `automation.*`/`scene.*` is picked up automatically,
+    inserted (not just patched) if it appears after initial load.
+  - `weather.forecast_home` → `OutdoorState`. No AQI/PM2.5 source — still 0.
+  - `sensor.kids_room_kids_temperature_*` → `IndoorState` — the ONE indoor
+    temp/humidity reading, standing in for the whole house. Not per-room.
 
-- **Deferred — not yet available in HA:**
-  - `SwitchState` (plugs/metered switches): no DIRIGERA plug entities exist
-    in HA yet — they may be paired to the hub but not yet added as HA
-    devices. Stub the type/component, don't wire it up this pass.
-  - Per-room `SensorState` (motion/temp/humidity/AQI): these are Matter
-    devices currently only on the Apple Home fabric, not commissioned into
-    HA. Stub/omit per-room sensor cards until they're added via HA's Matter
-    integration.
-- **Camera streams** (Nest doorbell) are out of scope for this build phase
-  — they need separate RTSP/WebRTC handling (HA's `go2rtc`) and aren't part
-  of the entity/state model above. Don't try to fit them into the same
-  WebSocket state pipe; design a dedicated `DoorbellCard` loading/stream
-  state when that phase starts.
+- **Deferred — still not available in HA:**
+  - `SwitchState`: one curated entry exists (above); no broader plug rollout.
+  - Per-room `SensorState` (motion/temp/humidity/AQI) is still not wired into
+    room cards, but the underlying blocker has partially cleared: your
+    **MYGGSPRAY sensors (bathroom, front door) now report reliably in HA**
+    via `dirigera_platform`. Wiring them into `SensorCard`/`Room.sensors` is
+    real, available work whenever it's prioritized — it's no longer blocked
+    on hardware/integration, just not built.
+  - **Eve motion sensors (laundry, kitchen) are NOT in HA.** Confirmed
+    dead-end: `dirigera_platform`'s Matter coverage is explicitly out of
+    scope for third-party (non-IKEA) devices, and Matter-direct-to-HA is
+    blocked by the Docker-on-Mac setup (no BLE passthrough, no host
+    networking, no HA-owned Thread border router). These two rooms'
+    motion-light automations currently run natively in **Apple Home** as a
+    deliberate fallback, invisible to Tactus/HA. Real fix requires either IKEA
+    hardware replacements for these two sensors, or a Thread/Matter dongle on
+    Linux hardware (a genuine architecture change, not a config tweak).
+  - **Nest doorbell/camera**: not decided. Recommendation on the table was
+    "wire up doorbell/motion/person events only, don't build a live-video
+    card" — battery cameras can't sustain always-on streaming and would fight
+    the wall-panel use case. No action taken either way.
 
 ## Design rules — do not violate these
 
-- **No raw hex in components.** Every colour is a `--tactus-*` token. If a
-  new colour is needed, add it to `theme.css` first, then reference it.
+- **No raw hex in components.** Every colour is a `--tactus-*` token.
 - **No flat drop-shadows.** Elevation is a soft glow in the card's own
-  accent colour, only on active/on states. See `--tactus-glow-strength-*`.
-- **No generic spinners.** Pending/awaiting-confirmation states use an
-  ambient pulse/breathe animation (`--tactus-motion-pending-pulse`), never
-  a spinner component. This is a hard rule carried over from the Aire
-  system's "Breather" pattern — same philosophy, new name if needed here.
-- **Numerals are always `--tactus-font-mono`** (Geist Mono). Labels and UI
-  text are always `--tactus-font-sans` (Instrument Sans). Don't mix.
-- **Radius scales with surface size** — bigger card, bigger radius. Use the
-  existing `--tactus-radius-*` scale, don't introduce arbitrary values.
-- **Colour means state, not decoration.** Amber = on/active/solar. Green =
-  good/battery. Blue = informational/EV. Red = error. Don't reach for a
-  token outside its semantic meaning just because it looks nice somewhere.
-- **Dark theme is default and primary.** A light "day" theme is a future
-  phase — don't build it speculatively, but don't hardcode anything in a
-  way that would block it later (i.e. keep using tokens, not literals).
+  accent colour, only on active/on states.
+- **No generic spinners.** Pending states use the ambient pulse/breathe
+  animation, never a spinner component.
+- **Numerals always `--tactus-font-mono`**, labels/UI always
+  `--tactus-font-sans`. Don't mix.
+- **Radius scales with surface size** — use the existing scale.
+- **Colour means state, not decoration.**
+- **Dark theme is default and primary** — still no light theme, still don't
+  block it.
+- **New precedent, added post-launch:** when a view genuinely doesn't fit its
+  viewport even with correct component sizing, the fix is **information
+  architecture (move content behind a nav button, like Energy/Automations),
+  not uniform scaling and not ad-hoc compacting of card dimensions.** Uniform
+  scaling was tried and explicitly rejected — it broke touch targets well
+  below Apple's 44pt minimum. If a future view has the same problem, look for
+  an IA move before touching any card's size.
+
+## Deployment
+
+**Why a custom proxy, not just nginx/Caddy in front of the static build:** HA
+authenticates its WebSocket **in-band**, not via a header — the client must
+send `{"type":"auth","access_token":...}` as the first message after
+`auth_required`. A header-injecting reverse proxy has no way to supply that.
+So `server/index.js` (plain Node `http` + `ws`, no framework) does two jobs:
+
+1. **REST**: proxies an **explicit allowlist** of `/api/*` calls (currently
+   just `GET /api/states`) to HA, adding `Authorization` server-side.
+   Deliberately not a wildcard — HA's REST API is fully-credentialed and
+   includes service calls, template rendering, etc. Add to the allowlist one
+   entry at a time if a future need arises, never by loosening the match.
+2. **WebSocket**: proxies the `/api/websocket` upgrade, forwarding every frame
+   unchanged in both directions **except** the client's outbound `auth`
+   frame, whose token is substituted server-side before forwarding upstream.
+   **Critical detail if you ever touch this file:** `ws` picks the wire
+   opcode (text vs binary) from the JS type handed to `.send()`, and every
+   message handler hands you a Buffer regardless of the original frame type.
+   Every forward call must pass the original `isBinary` flag explicitly via
+   `{ binary: isBinary }` — inferring it from the Buffer wrapper breaks the
+   WS handshake outright in a real browser (a Node-to-Node test harness that
+   `.toString()`s everything will NOT catch this; it only shows up against a
+   real client).
+
+Static file serving in the same proxy resolves paths against `dist/` and
+verifies containment before touching the filesystem (path-traversal guard),
+and sends `Cache-Control: no-cache` on `index.html` specifically (hashed
+`/assets/*` files are cached immutable) — otherwise a kiosked iPad has no way
+to pick up a rebuild. **This has not been proven against the real device
+yet** — worth confirming after any future rebuild that Safari actually
+refetches `index.html` rather than serving a stale cached copy.
+
+**What still holds the token client-side, on purpose, for dev only:**
+`VITE_HA_URL`/`VITE_HA_TOKEN` in `.env.local` for `npm run dev` against HA
+directly. `HAClient` defaults its base URL to `window.location.origin` when
+`VITE_HA_URL` is unset, which is what makes the same build work behind the
+proxy with zero client-side token. Vite's dev server proxies `/api` to the
+deployment proxy too, so `npm run dev` can exercise the real proxy path
+without a rebuild.
+
+**Docker gotchas hit during setup, don't repeat:**
+- `.dockerignore` is required and easy to forget — without it, `COPY . .`
+  walks the entire repo including root `node_modules` and `.git`, which can
+  turn a sub-second build-context step into 400+ seconds of file enumeration
+  even though the actual data transferred is tiny. Must exclude
+  `node_modules`, `server/node_modules`, `dist`, `.git`, `.env*`.
+- The build stage must `COPY package.json package-lock.json ./` and run
+  `npm ci`, not just `package.json` + `npm install`. Without the lockfile,
+  npm re-resolves the whole dependency tree from the registry instead of
+  installing pinned versions — dramatically slower and non-reproducible.
+- Interactive zsh does NOT treat `#` as a comment by default (unlike bash or
+  a zsh script) — a command like `cp .env.example .env  # comment` gets every
+  word after `#` passed as a literal argument to `cp`. Don't put inline `#`
+  comments in commands meant to be pasted into a live terminal.
+
+**Serving:** Docker container (`docker-compose.yml`, `restart:
+unless-stopped`), port 8080, alongside the existing `homeassistant` container
+on the same Mac mini. `.env` (gitignored) holds `HA_URL`/`HA_TOKEN` for the
+container; `.env.local` (also gitignored) holds the dev-mode
+`VITE_HA_URL`/`VITE_HA_TOKEN` pair — these are two different files serving
+two different modes, don't conflate them.
+
+**iPad:** Air 4th Gen (MYG02X/A), iPadOS 26.3. LCD not OLED — burn-in isn't a
+real concern for a static dashboard. Native landscape 1180×820 points. Safari
+→ Add to Home Screen → launched standalone → **Guided Access** (not
+Single App Mode). This was a deliberate choice: Single App Mode survives
+reboots/updates unattended but requires wiping and supervising the device via
+Apple Configurator, which wasn't worth it for an iPad that wasn't already
+spare. Real cost of this choice: **Guided Access does not survive a reboot or
+iOS update** — after either, someone has to walk over and manually re-arm it.
+Revisit Single App Mode if that manual re-arm becomes a real recurring
+annoyance.
 
 ## Known constraints from prior builds (carry these over)
 
 - MCP server credentials are session-scoped and cannot be accessed from
-  artifact iframes. If any Claude-powered feature gets added to Tactus
-  later, it must delegate via `sendPrompt()` rather than holding
-  credentials client-side. Not relevant to the HA connection itself (that's
-  a direct WebSocket/REST client), but relevant if AI features are added.
+  artifact iframes. If any Claude-powered feature gets added to Tactus later,
+  it must delegate via `sendPrompt()` rather than holding credentials
+  client-side.
 - Metric units only — kW, kWh, °C, km. Never imperial.
+- **Room-slug derivation is a landmine.** `mapHAStatesToRooms` falls back to
+  `entity_id.split("_")[0]` when no `attributes.room` exists — so
+  `light.living_room_*` lands in slug `"living"`, `light.front_door_*` lands
+  in `"front"`. This already caused a phantom duplicate Living Room card once
+  (a switch placed under the two-word `"living_room"` slug instead of
+  `"living"`). Any new entity naming needs to be checked against this, not
+  assumed.
+- **Color temperature convention confirmed 2026-07-10 against real DIRIGERA
+  devices:** HA reports kelvin directly (`color_temp_kelvin`,
+  `min/max_color_temp_kelvin`) for this integration — no mireds conversion
+  needed here, unlike some other HA light integrations.
+- **`unavailable` vs `unknown`** are both treated as the same "no real
+  reading" / error state throughout (`numOrNull`, light/switch/automation
+  mappers) — this was a deliberate simplification, not an oversight. If a
+  future entity needs to distinguish them, that's new work, not a bug fix.
+- Subscribes to `state_changed` for every HA entity (not a curated
+  `subscribe_entities` list as originally scoped). Fine at current scale; a
+  larger HA instance might warrant narrowing this.
 
-## Open questions to confirm before deploying
+## Open questions / real next items
 
-- ~~Exact HA entity IDs for the Powerwall, solar, grid, and Tesla
-  integration~~ — confirmed 2026-07-10, see entity mapping above.
-- ~~Whether the wall tablet runs a browser kiosk pointed at the Vercel
-  deployment, or a local network-only build~~ — decided: local-network-only.
-  No public deploy, no backend proxy needed for the token; step 5 (Vercel
-  deploy) is on hold until/unless that changes.
-- DIRIGERA plug/switch devices and Matter environmental sensors (motion/
-  temp/humidity/AQI) exist outside HA (hub-only / Apple Home fabric) and
-  need to be added to HA before `SwitchState` and per-room `SensorState`
-  can be wired up.
+- **House view still requires a swipe** to see the second row of room cards
+  (6 rooms wrap to 2 rows at 3-per-row and only the first row fits above the
+  fold on the iPad's 820pt viewport). Explicitly accepted as a pragmatic
+  tradeoff over uniform scaling (rejected — broke touch targets) or further
+  IA changes. Live with it and revisit only if it's a real daily annoyance.
+- **Grid import/export sign convention unconfirmed** — see entity mapping
+  above. Check against a real export event.
+- **`Cache-Control: no-cache` on index.html unproven on the real iPad** —
+  confirm a rebuild actually shows up without a manual force-refresh.
+- **iPad battery/charger automation** — not built. Recommended: automate the
+  charger via a smart plug, cutting power above ~80% and restoring below
+  ~40%, since a kiosked tablet left permanently on charge sits at 100%
+  indefinitely and degrades the battery faster than necessary.
+- **Eve sensors (laundry/kitchen)** — architectural dead-end confirmed for
+  HA-native; currently running on Apple Home fallback. Needs a real decision:
+  replace the hardware with IKEA-native sensors, or invest in Thread/Matter
+  hardware on Linux to bring Eve in properly.
+- **Nest doorbell/camera** — no decision taken. Events-only (doorbell press/
+  motion/person) was the recommendation; full video was advised against for
+  this specific device (battery-powered, WebRTC-only, no HA recording).
+- **Per-room SensorState** — no longer blocked (MYGGSPRAY bathroom/front door
+  report fine in HA) but not yet wired into `SensorCard`/room UI. Real,
+  available work whenever it's a priority.
+- Single App Mode — revisit if manually re-arming Guided Access after
+  reboots/updates becomes a recurring annoyance.
+
+## Working with Claude Code on this project
+
+Patterns that have worked well across every task on this project so far —
+worth continuing:
+
+- **Checkpoint discipline.** Scope each task with explicit stop points
+  ("show me your design before writing code", "show me the diff before
+  committing"). Code has repeatedly caught its own bugs when forced to reason
+  through the design before implementing, and holding the "don't merge"
+  instruction until independently verified has caught real issues (a WS
+  opcode bug that would have broken the app entirely in Safari; a
+  checkpoint-1 ordering bug in the reconnect logic) that its own test
+  harnesses couldn't reveal because they were built from a re-implementation
+  of the logic being tested, not the real file.
+- **Verify against the pushed branch, not the narrative.** Code's own summary
+  of what it did is not sufic — pull the branch and read the actual diff.
+  This caught real gaps more than once (a whole checkpoint's fixes sitting
+  uncommitted in Code's own clone with nothing pushed; a task that appeared
+  complete in narration but whose code hadn't reached the reviewed files).
+- **A stale local `git checkout` is a recurring failure mode.** More than
+  once, review happened against a local clone that hadn't been re-fetched
+  since a much earlier point in the same task — always `git fetch && git
+  pull` immediately before reading files to review, don't assume yesterday's
+  checkout is current.
+- **Real end-to-end testing beats a from-scratch reimplementation of the
+  logic under test.** The strongest test evidence in this project came from
+  driving the actual client code (`ha-client.ts`) against a controllable fake
+  HA server and capturing real wire traffic, then grepping for what should
+  and shouldn't appear in it — not from unit-testing a parallel
+  reimplementation of the same logic.
