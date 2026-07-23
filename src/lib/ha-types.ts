@@ -2,7 +2,7 @@ import { COLORS } from "@/types";
 import type {
   Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState,
   HomeLoadState, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
-  AutomationState, AutomationRunState, SceneState, IndoorState, SwitchState, SensorState,
+  AutomationState, AutomationRunState, SceneState, SwitchState, SensorState,
 } from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
@@ -35,8 +35,6 @@ export const HA_ENTITIES = {
   teslaTrunk: "cover.ghost_trunk",
   teslaWindows: "cover.ghost_windows",
   outdoorWeather: "weather.forecast_home",
-  indoorTemp: "sensor.kids_room_kids_temperature_temperature",
-  indoorHumidity: "sensor.kids_room_kids_temperature_humidity",
   donutSwitch: "switch.kids_room_usb_lamp",
 } as const;
 
@@ -60,13 +58,24 @@ const SWITCH_ROOM_OVERRIDE: Record<string, string> = {
 // Indoor air/environment sensors → per-room SensorState. Was a single
 // weather-station-only layer for kitchen/bedroom; now also covers the Living
 // Room IKEA air-quality sensor (Zigbee via dirigera_platform — local, prompt
-// updates, unlike the kitchen/bedroom modules' ~10-min cloud poll). pm25 is
-// optional — only the IKEA sensor reports it. Confirmed from HA Dev Tools →
-// States (kitchen/bedroom 2026-07-22, living 2026-07-23). NB the Living Room
-// slug is `living`, not `living_room` (see mapHAStatesToRooms). Excluded:
-// sensor.bedroom_bedroom_switch (different device's battery) and the IKEA
-// max/min_measured_pm2_5 entities (session extremes, not live).
-export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string; co2: string; pm25?: string }> = {
+// updates, unlike the kitchen/bedroom modules' ~10-min cloud poll) and the
+// Laundry temp/humidity sensor. co2/pm25 are optional — plain temp/humidity
+// sensors (Laundry) don't report either; only the IKEA sensor reports pm25.
+// Confirmed from HA Dev Tools → States (kitchen/bedroom 2026-07-22, living +
+// laundry 2026-07-23). NB the Living Room slug is `living`, not `living_room`
+// (see mapHAStatesToRooms). Excluded: sensor.bedroom_bedroom_switch (a
+// different device's battery), the IKEA max/min_measured_pm2_5 entities
+// (session extremes, not live), and the Laundry sensor's
+// ..._battery_percentage entity (same battery-exclusion convention as the
+// other two device families).
+//
+// The Laundry entry's entity_ids still carry the "kids_room" slug — this
+// sensor was physically relocated from the kids' room to the Laundry (HA
+// area/friendly_name now say "Laundry"), but its entity_ids were never
+// renamed. It used to be the single source for a now-retired dedicated
+// indoor-reading type; it's now just another per-room sensor like the rest
+// of this map.
+export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string; co2?: string; pm25?: string }> = {
   kitchen: {
     temp:     "sensor.kitchen_kitchen_temperature",
     humidity: "sensor.kitchen_kitchen_humidity",
@@ -83,11 +92,15 @@ export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string
     co2:      "sensor.living_room_living_room_air_quality_co2",
     pm25:     "sensor.living_room_living_room_air_quality_current_pm2_5",
   },
+  laundry: {
+    temp:     "sensor.kids_room_kids_temperature_temperature",
+    humidity: "sensor.kids_room_kids_temperature_humidity",
+  },
 };
 
 const INDOOR_AIR_IDS = new Set<string>(
   Object.values(INDOOR_AIR_SENSORS).flatMap((m) =>
-    [m.temp, m.humidity, m.co2, ...(m.pm25 ? [m.pm25] : [])]
+    [m.temp, m.humidity, ...(m.co2 ? [m.co2] : []), ...(m.pm25 ? [m.pm25] : [])]
   )
 );
 export function isIndoorAirEntity(id: string) { return INDOOR_AIR_IDS.has(id); }
@@ -105,7 +118,6 @@ const TESLA_IDS = new Set<string>([
   HA_ENTITIES.teslaFrunk, HA_ENTITIES.teslaTrunk, HA_ENTITIES.teslaWindows,
 ]);
 const OUTDOOR_IDS = new Set<string>([HA_ENTITIES.outdoorWeather]);
-const INDOOR_IDS = new Set<string>([HA_ENTITIES.indoorTemp, HA_ENTITIES.indoorHumidity]);
 
 // Reverse lookup for clearing a pending Tesla control once its entity's
 // state_changed confirms. climate.ghost_climate backs three separate keys
@@ -130,7 +142,6 @@ export function isPowerwallEntity(id: string) { return POWERWALL_IDS.has(id); }
 export function isGridEntity(id: string)      { return GRID_IDS.has(id); }
 export function isTeslaEntity(id: string)     { return TESLA_IDS.has(id); }
 export function isOutdoorEntity(id: string)   { return OUTDOOR_IDS.has(id); }
-export function isIndoorEntity(id: string)    { return INDOOR_IDS.has(id); }
 export function isSwitchEntity(id: string)    { return SWITCH_IDS.has(id); }
 export function isLightEntity(id: string)     { return id.startsWith("light."); }
 
@@ -277,9 +288,11 @@ export function indoorAirSensorsForRoom(states: HAStateMap, slug: string): Senso
   if (humidity !== null) {
     out.push({ id: cfg.humidity, device: `${label} Humidity`, type: "sensor", data: { kind: "humidity", humidity } });
   }
-  const co2 = numOrNull(states, cfg.co2, 0);
-  if (co2 !== null) {
-    out.push({ id: cfg.co2, device: `${label} CO₂`, type: "sensor", data: { kind: "co2", co2 } });
+  if (cfg.co2) {
+    const co2 = numOrNull(states, cfg.co2, 0);
+    if (co2 !== null) {
+      out.push({ id: cfg.co2, device: `${label} CO₂`, type: "sensor", data: { kind: "co2", co2 } });
+    }
   }
   if (cfg.pm25) {
     const pm25 = numOrNull(states, cfg.pm25, 1);
@@ -296,10 +309,10 @@ export function indoorAirSensorsForRoom(states: HAStateMap, slug: string): Senso
 // living_room, laundry, bathroom, front_door.
 //
 // Switches are placed via the curated SWITCH_ROOM_OVERRIDE map (explicit,
-// not derived). Sensors: indoor air sensors (temp/humidity/CO₂, optionally
-// PM2.5) are wired for kitchen, bedroom, and living via INDOOR_AIR_SENSORS;
-// every other room's sensors come back [] — the rest of per-room
-// SensorState is still deferred per CLAUDE.md.
+// not derived). Sensors: indoor air sensors (temp/humidity, optionally CO₂
+// and/or PM2.5) are wired for kitchen, bedroom, living, and laundry via
+// INDOOR_AIR_SENSORS; every other room's sensors come back [] — the rest of
+// per-room SensorState is still deferred per CLAUDE.md.
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomLights = new Map<string, LightState[]>();
   const roomSwitches = new Map<string, SwitchState[]>();
@@ -468,13 +481,6 @@ export function mapHAStatesToScenes(states: HAStateMap): SceneState[] {
     .filter((e) => isSceneEntity(e.entity_id))
     .map(mapSceneEntity)
     .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export function mapHAStatesToIndoor(states: HAStateMap): IndoorState {
-  return {
-    tempC: numOrNull(states, HA_ENTITIES.indoorTemp, 1),
-    humidityPct: numOrNull(states, HA_ENTITIES.indoorHumidity, 0),
-  };
 }
 
 export function mapHAStatesToOutdoor(states: HAStateMap): OutdoorState {

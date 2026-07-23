@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type {
-  Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, IndoorState, Color,
+  Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, Color,
   ControlStatus, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
   AutomationState, SceneState, MainView,
 } from "@/types";
@@ -9,10 +9,10 @@ import { HAClient, mergeStates } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
-  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapHAStatesToIndoor, mapLightEntity, mapSwitchEntity, computeRoomBrightness, hexToRgb,
+  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapLightEntity, mapSwitchEntity, computeRoomBrightness, hexToRgb,
   mapHAStatesToAutomations, mapHAStatesToScenes, mapAutomationEntity, mapSceneEntity,
   HA_ENTITIES, TESLA_CONTROL_ENTITY, INDOOR_AIR_SENSORS,
-  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isIndoorEntity, isSwitchEntity,
+  isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isSwitchEntity,
   isAutomationEntity, isSceneEntity, isIndoorAirEntity, indoorAirSensorsForRoom,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
@@ -49,7 +49,6 @@ export default function App() {
   const [tesla, setTesla]           = useState<TeslaState | null>(null);
   const [outdoor, setOutdoor]       = useState<OutdoorState | null>(null);
   const [homeLoad, setHomeLoad]     = useState<HomeLoadState | null>(null);
-  const [indoor, setIndoor]         = useState<IndoorState | null>(null);
   const [connError, setConnError]  = useState<string | null>(null);
   const [selectedRoomId, setRoomId] = useState<string | null>(null);
   const [teslaControl, setTeslaControl] = useState<Record<TeslaControlKey, ControlStatus>>(IDLE_TESLA_CONTROL);
@@ -143,7 +142,6 @@ export default function App() {
       setTesla(mapHAStatesToTesla(merged));
       setOutdoor(mapHAStatesToOutdoor(merged));
       setHomeLoad(mapHAStatesToHomeLoad(merged));
-      setIndoor(mapHAStatesToIndoor(merged));
       setAutomations(mapHAStatesToAutomations(merged));
       setScenes(mapHAStatesToScenes(merged));
 
@@ -265,8 +263,6 @@ export default function App() {
         setOutdoor(mapHAStatesToOutdoor(states));
       } else if (isHomeLoadEntity(entityId)) {
         setHomeLoad(mapHAStatesToHomeLoad(states));
-      } else if (isIndoorEntity(entityId)) {
-        setIndoor(mapHAStatesToIndoor(states));
       } else if (isIndoorAirEntity(entityId)) {
         setRooms((prev) => prev.map((r) =>
           INDOOR_AIR_SENSORS[r.id]
@@ -544,7 +540,7 @@ export default function App() {
     );
   }
 
-  if (!solar || !powerwall || !grid || !tesla || !outdoor || !homeLoad || !indoor) {
+  if (!solar || !powerwall || !grid || !tesla || !outdoor || !homeLoad) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--tactus-bg-base)" }}>
         <p className="text-[14px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Connecting to Home Assistant…</p>
@@ -585,7 +581,7 @@ export default function App() {
         </motion.div>
       ) : (
         <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
-          <HouseView rooms={rooms} outdoor={outdoor} indoor={indoor}
+          <HouseView rooms={rooms} outdoor={outdoor}
             onNavigate={setRoomId}
             onOpenAutomations={openAutomations}
             onOpenEnergy={openEnergy}

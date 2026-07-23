@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Zap, Gauge } from "lucide-react";
-import type { Room, OutdoorState, IndoorState } from "@/types";
+import type { Room, OutdoorState } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { computeRoomBrightness } from "@/lib/ha-types";
 import { RoomControls } from "@/components/controls/RoomControls";
@@ -10,8 +10,8 @@ import { RoomCard } from "@/components/cards/RoomCard";
 
 const COMMIT_DELAY = 400;
 
-export function HouseView({ rooms, outdoor, indoor, onNavigate, onOpenAutomations, onOpenEnergy, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
-  rooms: Room[]; outdoor: OutdoorState; indoor: IndoorState;
+export function HouseView({ rooms, outdoor, onNavigate, onOpenAutomations, onOpenEnergy, onRoomToggle, onRoomBrightness, onHouseToggle, onHouseBrightness }: {
+  rooms: Room[]; outdoor: OutdoorState;
   onNavigate: (id: string) => void;
   onOpenAutomations: () => void;
   onOpenEnergy: () => void;
@@ -66,7 +66,7 @@ export function HouseView({ rooms, outdoor, indoor, onNavigate, onOpenAutomation
       </div>
 
       <div className="p-8 flex flex-col gap-10">
-        <EnvironmentBar rooms={rooms} indoor={indoor} outdoor={outdoor} />
+        <EnvironmentBar rooms={rooms} outdoor={outdoor} />
 
         <div>
           <SectionHeading label="Rooms" count={rooms.length} />

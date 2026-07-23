@@ -29,7 +29,8 @@ flagged decision (see "Design rules" and the Energy-view precedent below).
   (bedroom/kitchen/living_room/laundry/bathroom/front_door), Tesla ("Ghost",
   a Model 3 Highland) with full quick-actions, Solar/Powerwall/Grid, one
   curated switch (a Kasa-style plug), automations & scenes (dynamically
-  discovered, not curated), and a two-sensor indoor reading.
+  discovered, not curated), and per-room indoor air sensors (Kitchen,
+  Bedroom, Living Room, Laundry).
 - **Reconnect-safe.** On any WebSocket drop (HA restart, network blip), the
   app re-fetches full state on reconnect and merges it in rather than trusting
   stale cached values — see `mergeStates`/`rehydrate` in `App.tsx`/
@@ -45,11 +46,13 @@ flagged decision (see "Design rules" and the Energy-view precedent below).
 - Data modelling unchanged in shape from the original design import:
   `LightState`, `SwitchState`, `SensorState`, `SolarState`, `PowerwallState`,
   `GridState`, `TeslaState`, `Room`, plus newer additions `AutomationState`,
-  `SceneState`, `IndoorState`, `HomeLoadState`. `SensorState`'s discriminated
+  `SceneState`, `HomeLoadState`. `SensorState`'s discriminated
   union gained a `co2` kind (2026-07-22) for the Netatmo CO₂ ppm reading —
   kept separate from `aqi` since it isn't an AQI/PM2.5 metric — and a `pm25`
   kind (2026-07-23) for the Living Room IKEA air-quality sensor's PM2.5
   reading, since Netatmo's kitchen/bedroom modules don't report PM2.5.
+  The dedicated `IndoorState` type is retired (2026-07-23) — see "Entity
+  mapping" below.
 
 ## Build order (historical — all steps below are done)
 
@@ -164,10 +167,9 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
     anything matching `automation.*`/`scene.*` is picked up automatically,
     inserted (not just patched) if it appears after initial load.
   - `weather.forecast_home` → `OutdoorState`. No AQI/PM2.5 source — still 0.
-  - `sensor.kids_room_kids_temperature_*` → `IndoorState` — the ONE indoor
-    temp/humidity reading, standing in for the whole house. Not per-room.
   - **Indoor air sensors** (per-room `SensorState`, via `INDOOR_AIR_SENSORS`
-    in `ha-types.ts`) — two device families feeding the same layer:
+    in `ha-types.ts`) — three device families feeding the same layer, with
+    `co2`/`pm25` optional per entry:
     - **Netatmo Smart Weather Station** (2 indoor modules, confirmed
       2026-07-22): `sensor.kitchen_kitchen_{temperature,humidity,carbon_dioxide}`
       (Kitchen, battery add-on module) and
@@ -182,27 +184,44 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
       via `dirigera_platform` — local, so `state_changed` arrives promptly,
       unlike Netatmo's cloud poll:
       `sensor.living_room_living_room_air_quality_{temperature,humidity,co2,current_pm2_5}`.
-      The only sensor of the three that reports **PM2.5** — hence `pm25` being
-      optional on `INDOOR_AIR_SENSORS` entries. `max_measured_pm2_5` /
-      `min_measured_pm2_5` are excluded (session extremes, not live readings).
+      The only sensor of the three families that reports **PM2.5** — hence
+      `pm25` being optional on `INDOOR_AIR_SENSORS` entries. `max_measured_pm2_5`
+      / `min_measured_pm2_5` are excluded (session extremes, not live readings).
       **Critical:** the Living Room's Tactus room slug is `living`, not
       `living_room` — same landmine as `SWITCH_ROOM_OVERRIDE` below; keying
       this under `living_room` spawns a phantom Living Room card.
-    - Together these feed the `EnvironmentBar` Indoor **CO₂** and **PM2.5**
-      metrics; `kids_room` stays the Indoor temp/humidity source (kept
-      alongside, not replaced).
+    - **Laundry temp/humidity sensor** (confirmed 2026-07-23):
+      `sensor.kids_room_kids_temperature_{temperature,humidity}`. Physically
+      relocated from the kids' room to the Laundry — HA area/friendly_name
+      now say "Laundry", but the entity_ids were never renamed, so they still
+      carry the old `kids_room` slug. This was formerly the single source for
+      a dedicated `IndoorState` type (now retired — see below); it's now just
+      another `INDOOR_AIR_SENSORS` entry, temp/humidity only (no CO₂/PM2.5).
+      Its `..._battery_percentage` entity is excluded, same convention as the
+      other two device families' battery entities.
+    - Together these feed the `EnvironmentBar` Indoor panel: **Temp** and
+      **Humidity** are now a min–max range across whichever rooms report
+      them (see below), **CO₂** and **PM2.5** stay averages across whichever
+      rooms report those.
+  - **`IndoorState` is retired** (2026-07-23). It used to be the sole source
+    for the `EnvironmentBar` Indoor temp/humidity, fed by the sensor that's
+    now the Laundry entry above. The Environment bar no longer has one
+    canonical "the house's" temp/humidity reading — it now shows the
+    min–max range across all `INDOOR_AIR_SENSORS` rooms' temp/humidity
+    values instead (rendered as a single value when min equals max).
 
 - **Deferred — still not available in HA:**
   - `SwitchState`: one curated entry exists (above); no broader plug rollout.
-  - Per-room `SensorState` (motion/temp/humidity/AQI/PM2.5): temp/humidity/CO₂
-    are wired for Kitchen, Bedroom, and Living Room; PM2.5 additionally for
-    Living Room (see above). Motion and the wider MYGGSPRAY/Matter
-    environmental sensors remain unwired, but the underlying blocker has
-    partially cleared for the MYGGSPRAY ones: your **MYGGSPRAY sensors
-    (bathroom, front door) now report reliably in HA** via `dirigera_platform`.
-    Wiring them into `SensorCard`/`Room.sensors` is real, available work
-    whenever it's prioritized — it's no longer blocked on hardware/
-    integration, just not built.
+  - Per-room `SensorState` (motion/temp/humidity/AQI/PM2.5): temp/humidity
+    are wired for Kitchen, Bedroom, Living Room, and Laundry; CO₂ additionally
+    for Kitchen/Bedroom/Living; PM2.5 additionally for Living Room only (see
+    above). Motion and the wider MYGGSPRAY/Matter environmental sensors
+    remain unwired, but the underlying blocker has partially cleared for the
+    MYGGSPRAY ones: your **MYGGSPRAY sensors (bathroom, front door) now
+    report reliably in HA** via `dirigera_platform`. Wiring them into
+    `SensorCard`/`Room.sensors` is real, available work whenever it's
+    prioritized — it's no longer blocked on hardware/integration, just not
+    built.
   - **Eve motion sensors (laundry, kitchen) are NOT in HA.** Confirmed
     dead-end: `dirigera_platform`'s Matter coverage is explicitly out of
     scope for third-party (non-IKEA) devices, and Matter-direct-to-HA is
@@ -360,13 +379,16 @@ annoyance.
 - **Nest doorbell/camera** — no decision taken. Events-only (doorbell press/
   motion/person) was the recommendation; full video was advised against for
   this specific device (battery-powered, WebRTC-only, no HA recording).
-- **Per-room SensorState** — temp/humidity/CO₂ now wired for Kitchen,
-  Bedroom, and Living Room (confirmed 2026-07-22 / 2026-07-23); PM2.5 is now
-  live for the Living Room and shown in the `EnvironmentBar` Indoor panel.
-  Motion is still unwired everywhere, and outdoor AQI/PM2.5 remain unsourced
-  (no entity exists yet). MYGGSPRAY (bathroom/front door) is no longer
-  blocked (reports fine in HA) but not yet wired into `SensorCard`/room UI —
-  real, available work whenever it's a priority.
+- **Per-room SensorState** — temp/humidity now wired for Kitchen, Bedroom,
+  Living Room, and Laundry (confirmed 2026-07-22 / 2026-07-23); CO₂
+  additionally for Kitchen/Bedroom/Living, PM2.5 additionally for Living
+  Room only. The `EnvironmentBar` Indoor panel now shows temp/humidity as a
+  min–max range across these rooms (the dedicated `IndoorState` single-
+  source type is retired) and CO₂/PM2.5 as averages. Motion is still unwired
+  everywhere, and outdoor AQI/PM2.5 remain unsourced (no entity exists yet).
+  MYGGSPRAY (bathroom/front door) is no longer blocked (reports fine in HA)
+  but not yet wired into `SensorCard`/room UI — real, available work
+  whenever it's a priority.
 - Single App Mode — revisit if manually re-arming Guided Access after
   reboots/updates becomes a recurring annoyance.
 
