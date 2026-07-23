@@ -57,12 +57,16 @@ const SWITCH_ROOM_OVERRIDE: Record<string, string> = {
   [HA_ENTITIES.donutSwitch]: "living",
 };
 
-// Netatmo Smart Weather Station indoor modules — cloud-polled (~10 min), no
-// local push. Confirmed from HA Developer Tools → States 2026-07-22. "Bedroom"
-// is the mains base station; "Kitchen" is the battery add-on module. Core
-// three only (temp/humidity/CO₂). sensor.bedroom_bedroom_switch is a different
-// device's battery (no Netatmo attribution) — deliberately excluded.
-export const NETATMO_ROOM_SENSORS: Record<string, { temp: string; humidity: string; co2: string }> = {
+// Indoor air/environment sensors → per-room SensorState. Was a single
+// weather-station-only layer for kitchen/bedroom; now also covers the Living
+// Room IKEA air-quality sensor (Zigbee via dirigera_platform — local, prompt
+// updates, unlike the kitchen/bedroom modules' ~10-min cloud poll). pm25 is
+// optional — only the IKEA sensor reports it. Confirmed from HA Dev Tools →
+// States (kitchen/bedroom 2026-07-22, living 2026-07-23). NB the Living Room
+// slug is `living`, not `living_room` (see mapHAStatesToRooms). Excluded:
+// sensor.bedroom_bedroom_switch (different device's battery) and the IKEA
+// max/min_measured_pm2_5 entities (session extremes, not live).
+export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string; co2: string; pm25?: string }> = {
   kitchen: {
     temp:     "sensor.kitchen_kitchen_temperature",
     humidity: "sensor.kitchen_kitchen_humidity",
@@ -73,12 +77,20 @@ export const NETATMO_ROOM_SENSORS: Record<string, { temp: string; humidity: stri
     humidity: "sensor.bedroom_bedroom_humidity",
     co2:      "sensor.bedroom_bedroom_carbon_dioxide",
   },
+  living: {
+    temp:     "sensor.living_room_living_room_air_quality_temperature",
+    humidity: "sensor.living_room_living_room_air_quality_humidity",
+    co2:      "sensor.living_room_living_room_air_quality_co2",
+    pm25:     "sensor.living_room_living_room_air_quality_current_pm2_5",
+  },
 };
 
-const NETATMO_IDS = new Set<string>(
-  Object.values(NETATMO_ROOM_SENSORS).flatMap((m) => [m.temp, m.humidity, m.co2])
+const INDOOR_AIR_IDS = new Set<string>(
+  Object.values(INDOOR_AIR_SENSORS).flatMap((m) =>
+    [m.temp, m.humidity, m.co2, ...(m.pm25 ? [m.pm25] : [])]
+  )
 );
-export function isNetatmoEntity(id: string) { return NETATMO_IDS.has(id); }
+export function isIndoorAirEntity(id: string) { return INDOOR_AIR_IDS.has(id); }
 
 const SOLAR_IDS = new Set<string>([HA_ENTITIES.solarPower, HA_ENTITIES.solarEnergyToday]);
 const HOME_LOAD_IDS = new Set<string>([HA_ENTITIES.homeLoadPower]);
@@ -245,13 +257,14 @@ export function computeRoomBrightness(lights: LightState[]): number {
   return onLights.length ? Math.round(onLights.reduce((s, l) => s + l.brightness, 0) / onLights.length) : 0;
 }
 
-// Netatmo indoor modules don't expose a temp_trend attribute (confirmed
-// against the real entities 2026-07-22 — Dev Tools shows only state_class,
-// unit_of_measurement, attribution, device_class, friendly_name), so trend
-// is always "stable" here rather than reading a nonexistent attribute.
+// The kitchen/bedroom weather-station modules don't expose a temp_trend
+// attribute (confirmed against the real entities 2026-07-22 — Dev Tools
+// shows only state_class, unit_of_measurement, attribution, device_class,
+// friendly_name), so trend is always "stable" here rather than reading a
+// nonexistent attribute.
 // Offline/unknown entities render nothing (numOrNull), never a misleading 0.
-export function netatmoSensorsForRoom(states: HAStateMap, slug: string): SensorState[] {
-  const cfg = NETATMO_ROOM_SENSORS[slug];
+export function indoorAirSensorsForRoom(states: HAStateMap, slug: string): SensorState[] {
+  const cfg = INDOOR_AIR_SENSORS[slug];
   if (!cfg) return [];
   const label = roomNameFromSlug(slug);
   const out: SensorState[] = [];
@@ -268,6 +281,12 @@ export function netatmoSensorsForRoom(states: HAStateMap, slug: string): SensorS
   if (co2 !== null) {
     out.push({ id: cfg.co2, device: `${label} CO₂`, type: "sensor", data: { kind: "co2", co2 } });
   }
+  if (cfg.pm25) {
+    const pm25 = numOrNull(states, cfg.pm25, 1);
+    if (pm25 !== null) {
+      out.push({ id: cfg.pm25, device: `${label} PM2.5`, type: "sensor", data: { kind: "pm25", pm25 } });
+    }
+  }
   return out;
 }
 
@@ -277,10 +296,10 @@ export function netatmoSensorsForRoom(states: HAStateMap, slug: string): SensorS
 // living_room, laundry, bathroom, front_door.
 //
 // Switches are placed via the curated SWITCH_ROOM_OVERRIDE map (explicit,
-// not derived). Sensors: Netatmo indoor modules (temp/humidity/CO₂) are wired
-// for kitchen and bedroom via NETATMO_ROOM_SENSORS; every other room's
-// sensors come back [] — the rest of per-room SensorState is still deferred
-// per CLAUDE.md.
+// not derived). Sensors: indoor air sensors (temp/humidity/CO₂, optionally
+// PM2.5) are wired for kitchen, bedroom, and living via INDOOR_AIR_SENSORS;
+// every other room's sensors come back [] — the rest of per-room
+// SensorState is still deferred per CLAUDE.md.
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomLights = new Map<string, LightState[]>();
   const roomSwitches = new Map<string, SwitchState[]>();
@@ -304,7 +323,7 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomSlugs = new Set([
     ...roomLights.keys(),
     ...roomSwitches.keys(),
-    ...Object.keys(NETATMO_ROOM_SENSORS),
+    ...Object.keys(INDOOR_AIR_SENSORS),
   ]);
   return Array.from(roomSlugs).map((slug) => {
     const lights = roomLights.get(slug) ?? [];
@@ -313,7 +332,7 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
       name: roomNameFromSlug(slug),
       lights,
       switches: roomSwitches.get(slug) ?? [],
-      sensors: netatmoSensorsForRoom(states, slug),
+      sensors: indoorAirSensorsForRoom(states, slug),
       roomBrightness: computeRoomBrightness(lights),
     };
   });

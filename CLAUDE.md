@@ -47,7 +47,9 @@ flagged decision (see "Design rules" and the Energy-view precedent below).
   `GridState`, `TeslaState`, `Room`, plus newer additions `AutomationState`,
   `SceneState`, `IndoorState`, `HomeLoadState`. `SensorState`'s discriminated
   union gained a `co2` kind (2026-07-22) for the Netatmo CO₂ ppm reading —
-  kept separate from `aqi` since it isn't an AQI/PM2.5 metric.
+  kept separate from `aqi` since it isn't an AQI/PM2.5 metric — and a `pm25`
+  kind (2026-07-23) for the Living Room IKEA air-quality sensor's PM2.5
+  reading, since Netatmo's kitchen/bedroom modules don't report PM2.5.
 
 ## Build order (historical — all steps below are done)
 
@@ -164,31 +166,43 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
   - `weather.forecast_home` → `OutdoorState`. No AQI/PM2.5 source — still 0.
   - `sensor.kids_room_kids_temperature_*` → `IndoorState` — the ONE indoor
     temp/humidity reading, standing in for the whole house. Not per-room.
-  - **Netatmo Smart Weather Station** (2 indoor modules, confirmed
-    2026-07-22) → per-room `SensorState` via `NETATMO_ROOM_SENSORS` in
-    `ha-types.ts`:
-    `sensor.kitchen_kitchen_{temperature,humidity,carbon_dioxide}` (Kitchen,
-    battery add-on module) and
-    `sensor.bedroom_bedroom_{temperature,humidity,carbon_dioxide}` (Bedroom,
-    mains base station). Core three only — temp/humidity/CO₂;
-    noise/pressure/battery/connectivity intentionally unmapped. Cloud-polled
-    (~10 min), no local push — infrequent `state_changed` events here are
-    expected, not a bug. No `temp_trend` attribute is exposed, so trend is
-    hardcoded "stable". `sensor.bedroom_bedroom_switch` is deliberately
-    excluded (a different device's battery — no Netatmo attribution). Also
-    feeds the `EnvironmentBar` Indoor **CO₂** metric; `kids_room` stays the
-    Indoor temp/humidity source (kept alongside, not replaced).
+  - **Indoor air sensors** (per-room `SensorState`, via `INDOOR_AIR_SENSORS`
+    in `ha-types.ts`) — two device families feeding the same layer:
+    - **Netatmo Smart Weather Station** (2 indoor modules, confirmed
+      2026-07-22): `sensor.kitchen_kitchen_{temperature,humidity,carbon_dioxide}`
+      (Kitchen, battery add-on module) and
+      `sensor.bedroom_bedroom_{temperature,humidity,carbon_dioxide}` (Bedroom,
+      mains base station). Core three only — temp/humidity/CO₂;
+      noise/pressure/battery/connectivity intentionally unmapped. Cloud-polled
+      (~10 min), no local push — infrequent `state_changed` events here are
+      expected, not a bug. No `temp_trend` attribute is exposed, so trend is
+      hardcoded "stable". `sensor.bedroom_bedroom_switch` is deliberately
+      excluded (a different device's battery — no Netatmo attribution).
+    - **IKEA air-quality sensor, Living Room** (confirmed 2026-07-23), Zigbee
+      via `dirigera_platform` — local, so `state_changed` arrives promptly,
+      unlike Netatmo's cloud poll:
+      `sensor.living_room_living_room_air_quality_{temperature,humidity,co2,current_pm2_5}`.
+      The only sensor of the three that reports **PM2.5** — hence `pm25` being
+      optional on `INDOOR_AIR_SENSORS` entries. `max_measured_pm2_5` /
+      `min_measured_pm2_5` are excluded (session extremes, not live readings).
+      **Critical:** the Living Room's Tactus room slug is `living`, not
+      `living_room` — same landmine as `SWITCH_ROOM_OVERRIDE` below; keying
+      this under `living_room` spawns a phantom Living Room card.
+    - Together these feed the `EnvironmentBar` Indoor **CO₂** and **PM2.5**
+      metrics; `kids_room` stays the Indoor temp/humidity source (kept
+      alongside, not replaced).
 
 - **Deferred — still not available in HA:**
   - `SwitchState`: one curated entry exists (above); no broader plug rollout.
-  - Per-room `SensorState` (motion/temp/humidity/AQI): temp/humidity/CO₂ are
-    now wired for the Kitchen & Bedroom Netatmo modules (see above). Motion
-    and the wider MYGGSPRAY/Matter environmental sensors remain unwired, but
-    the underlying blocker has partially cleared for the MYGGSPRAY ones: your
-    **MYGGSPRAY sensors (bathroom, front door) now report reliably in HA**
-    via `dirigera_platform`. Wiring them into `SensorCard`/`Room.sensors` is
-    real, available work whenever it's prioritized — it's no longer blocked
-    on hardware/integration, just not built.
+  - Per-room `SensorState` (motion/temp/humidity/AQI/PM2.5): temp/humidity/CO₂
+    are wired for Kitchen, Bedroom, and Living Room; PM2.5 additionally for
+    Living Room (see above). Motion and the wider MYGGSPRAY/Matter
+    environmental sensors remain unwired, but the underlying blocker has
+    partially cleared for the MYGGSPRAY ones: your **MYGGSPRAY sensors
+    (bathroom, front door) now report reliably in HA** via `dirigera_platform`.
+    Wiring them into `SensorCard`/`Room.sensors` is real, available work
+    whenever it's prioritized — it's no longer blocked on hardware/
+    integration, just not built.
   - **Eve motion sensors (laundry, kitchen) are NOT in HA.** Confirmed
     dead-end: `dirigera_platform`'s Matter coverage is explicitly out of
     scope for third-party (non-IKEA) devices, and Matter-direct-to-HA is
@@ -346,12 +360,13 @@ annoyance.
 - **Nest doorbell/camera** — no decision taken. Events-only (doorbell press/
   motion/person) was the recommendation; full video was advised against for
   this specific device (battery-powered, WebRTC-only, no HA recording).
-- **Per-room SensorState** — temp/humidity/CO₂ now wired for Kitchen &
-  Bedroom via the Netatmo Smart Weather Station (confirmed 2026-07-22).
-  Motion is still unwired everywhere. MYGGSPRAY (bathroom/front door) is no
-  longer blocked (reports fine in HA) but not yet wired into
-  `SensorCard`/room UI beyond Netatmo — real, available work whenever it's
-  a priority.
+- **Per-room SensorState** — temp/humidity/CO₂ now wired for Kitchen,
+  Bedroom, and Living Room (confirmed 2026-07-22 / 2026-07-23); PM2.5 is now
+  live for the Living Room and shown in the `EnvironmentBar` Indoor panel.
+  Motion is still unwired everywhere, and outdoor AQI/PM2.5 remain unsourced
+  (no entity exists yet). MYGGSPRAY (bathroom/front door) is no longer
+  blocked (reports fine in HA) but not yet wired into `SensorCard`/room UI —
+  real, available work whenever it's a priority.
 - Single App Mode — revisit if manually re-arming Guided Access after
   reboots/updates becomes a recurring annoyance.
 

@@ -1,5 +1,5 @@
 import { Thermometer, Droplets, Wind } from "lucide-react";
-import type { Room, OutdoorState, IndoorState, AQISensor, CO2Sensor } from "@/types";
+import type { Room, OutdoorState, IndoorState, AQISensor, CO2Sensor, PM25Sensor } from "@/types";
 
 function avg(nums: number[]) { return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null; }
 
@@ -24,20 +24,24 @@ export function EnvironmentBar({ rooms, indoor, outdoor }: { rooms: Room[]; indo
   // AQI still comes from per-room Matter sensors (deferred/empty per
   // CLAUDE.md — not part of this task). Temp/humidity come from the
   // dedicated indoor sensor entity, not an averaged room sensor array. CO₂
-  // comes from the Netatmo per-room sensors (kitchen + bedroom) now that
-  // that data layer is wired up — kids_room temp/humidity is untouched.
+  // and PM2.5 come from the indoor air per-room sensors (kitchen + bedroom
+  // weather-station modules, living IKEA air-quality) now that that data
+  // layer is wired up — kids_room temp/humidity is untouched.
   const aqis = allSensors.filter((s) => s.data.kind === "aqi").map((s) => (s.data as AQISensor).aqi);
   const co2s = allSensors.filter((s) => s.data.kind === "co2").map((s) => (s.data as CO2Sensor).co2);
+  const pm25s = allSensors.filter((s) => s.data.kind === "pm25").map((s) => (s.data as PM25Sensor).pm25);
 
   const indoorTemp  = indoor.tempC;
   const indoorHumid = indoor.humidityPct;
   const indoorAqi   = avg(aqis);
   const indoorCo2   = avg(co2s);
+  const indoorPm25  = avg(pm25s);
 
   const tempColor  = (t: number) => t < 18 ? "var(--tactus-blue-light)" : t > 26 ? "var(--tactus-pink)" : "var(--tactus-green)";
   const humidColor = (h: number) => h < 30 ? "var(--tactus-amber)" : h > 65 ? "var(--tactus-blue)" : "var(--tactus-green)";
   const aqiColor   = (a: number) => a <= 50 ? "var(--tactus-green)" : a <= 100 ? "var(--tactus-amber)" : "var(--tactus-pink)";
   const co2Color   = (c: number) => c < 800 ? "var(--tactus-green)" : c < 1200 ? "var(--tactus-amber)" : "var(--tactus-pink)";
+  const pm25Color  = (v: number) => v <= 12 ? "var(--tactus-green)" : v <= 35 ? "var(--tactus-amber)" : "var(--tactus-pink)";
 
   return (
     <div className="rounded-tactus-xl overflow-hidden" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
@@ -51,6 +55,7 @@ export function EnvironmentBar({ rooms, indoor, outdoor }: { rooms: Room[]; indo
             {indoorHumid !== null && <EnvMetric icon={<Droplets    size={12} />} value={indoorHumid.toFixed(0)}  unit="%"   label="Humidity" color={humidColor(indoorHumid)} />}
             {indoorAqi   !== null && <EnvMetric icon={<Wind        size={12} />} value={indoorAqi.toFixed(0)}    unit=" AQI" label="Air"     color={aqiColor(indoorAqi)} />}
             {indoorCo2   !== null && <EnvMetric icon={<span style={{ fontSize: 10, fontWeight: 700 }}>CO₂</span>} value={indoorCo2.toFixed(0)} unit=" ppm" label="Carbon" color={co2Color(indoorCo2)} />}
+            {indoorPm25  !== null && <EnvMetric icon={<span style={{ fontSize: 10, fontWeight: 700 }}>PM</span>} value={indoorPm25.toFixed(1)} unit=" µg" label="PM2.5" color={pm25Color(indoorPm25)} />}
           </div>
         </div>
 
