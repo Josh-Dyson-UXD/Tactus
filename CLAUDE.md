@@ -199,9 +199,9 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
       another `INDOOR_AIR_SENSORS` entry, temp/humidity only (no CO₂/PM2.5).
       Its `..._battery_percentage` entity is excluded, same convention as the
       other two device families' battery entities.
-    - Together these feed the `EnvironmentBar` Indoor panel: **Temp** and
-      **Humidity** are now a min–max range across whichever rooms report
-      them (see below), **CO₂** and **PM2.5** stay averages across whichever
+    - Together these feed the `EnvironmentBar` (redesigned 2026-07-23, see
+      below): **Temp** and **Humidity** are a min–max range across whichever
+      rooms report them, **CO₂** and **PM2.5** stay averages across whichever
       rooms report those.
   - **`IndoorState` is retired** (2026-07-23). It used to be the sole source
     for the `EnvironmentBar` Indoor temp/humidity, fed by the sensor that's
@@ -209,6 +209,17 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
     canonical "the house's" temp/humidity reading — it now shows the
     min–max range across all `INDOOR_AIR_SENSORS` rooms' temp/humidity
     values instead (rendered as a single value when min equals max).
+  - **`EnvironmentBar` redesign** (2026-07-23) — purely presentational, no
+    data-layer change. Indoor now leads with a tactile range rail: a
+    recessed track with a coloured segment spanning coolest→warmest room,
+    a dot at each end, room names labelling the endpoints, and the average
+    shown top-right; Humidity/CO₂/PM2.5 sit in soft filled tiles below.
+    Outdoor leads with a hero temperature, with Humidity and a new
+    Conditions tile (weather icon + label, promoted from the old corner
+    text) below. Indoor AQI (never had a source) and outdoor AQI/PM2.5 (no
+    source yet — WAQI is the planned add) are left off entirely rather than
+    showing meaningless zeros; `OutdoorState.aqi`/`pm25` stay wired at 0 in
+    the data layer for when that source arrives.
 
 - **Deferred — still not available in HA:**
   - `SwitchState`: one curated entry exists (above); no broader plug rollout.
