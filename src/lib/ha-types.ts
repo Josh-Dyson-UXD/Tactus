@@ -2,7 +2,7 @@ import { COLORS } from "@/types";
 import type {
   Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState,
   HomeLoadState, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
-  AutomationState, AutomationRunState, SceneState, IndoorState, SwitchState,
+  AutomationState, AutomationRunState, SceneState, IndoorState, SwitchState, SensorState,
 } from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
@@ -56,6 +56,29 @@ export const HA_ENTITIES = {
 const SWITCH_ROOM_OVERRIDE: Record<string, string> = {
   [HA_ENTITIES.donutSwitch]: "living",
 };
+
+// Netatmo Smart Weather Station indoor modules — cloud-polled (~10 min), no
+// local push. Confirmed from HA Developer Tools → States 2026-07-22. "Bedroom"
+// is the mains base station; "Kitchen" is the battery add-on module. Core
+// three only (temp/humidity/CO₂). sensor.bedroom_bedroom_switch is a different
+// device's battery (no Netatmo attribution) — deliberately excluded.
+export const NETATMO_ROOM_SENSORS: Record<string, { temp: string; humidity: string; co2: string }> = {
+  kitchen: {
+    temp:     "sensor.kitchen_kitchen_temperature",
+    humidity: "sensor.kitchen_kitchen_humidity",
+    co2:      "sensor.kitchen_kitchen_carbon_dioxide",
+  },
+  bedroom: {
+    temp:     "sensor.bedroom_bedroom_temperature",
+    humidity: "sensor.bedroom_bedroom_humidity",
+    co2:      "sensor.bedroom_bedroom_carbon_dioxide",
+  },
+};
+
+const NETATMO_IDS = new Set<string>(
+  Object.values(NETATMO_ROOM_SENSORS).flatMap((m) => [m.temp, m.humidity, m.co2])
+);
+export function isNetatmoEntity(id: string) { return NETATMO_IDS.has(id); }
 
 const SOLAR_IDS = new Set<string>([HA_ENTITIES.solarPower, HA_ENTITIES.solarEnergyToday]);
 const HOME_LOAD_IDS = new Set<string>([HA_ENTITIES.homeLoadPower]);
@@ -222,14 +245,42 @@ export function computeRoomBrightness(lights: LightState[]): number {
   return onLights.length ? Math.round(onLights.reduce((s, l) => s + l.brightness, 0) / onLights.length) : 0;
 }
 
+// Netatmo indoor modules don't expose a temp_trend attribute (confirmed
+// against the real entities 2026-07-22 — Dev Tools shows only state_class,
+// unit_of_measurement, attribution, device_class, friendly_name), so trend
+// is always "stable" here rather than reading a nonexistent attribute.
+// Offline/unknown entities render nothing (numOrNull), never a misleading 0.
+export function netatmoSensorsForRoom(states: HAStateMap, slug: string): SensorState[] {
+  const cfg = NETATMO_ROOM_SENSORS[slug];
+  if (!cfg) return [];
+  const label = roomNameFromSlug(slug);
+  const out: SensorState[] = [];
+
+  const temp = numOrNull(states, cfg.temp, 1);
+  if (temp !== null) {
+    out.push({ id: cfg.temp, device: `${label} Temperature`, type: "sensor", data: { kind: "temp", tempC: temp, trend: "stable" } });
+  }
+  const humidity = numOrNull(states, cfg.humidity, 0);
+  if (humidity !== null) {
+    out.push({ id: cfg.humidity, device: `${label} Humidity`, type: "sensor", data: { kind: "humidity", humidity } });
+  }
+  const co2 = numOrNull(states, cfg.co2, 0);
+  if (co2 !== null) {
+    out.push({ id: cfg.co2, device: `${label} CO₂`, type: "sensor", data: { kind: "co2", co2 } });
+  }
+  return out;
+}
+
 // Rooms are derived from DIRIGERA light entity_ids (light.<room>_<device>),
 // since /api/states doesn't expose HA's area registry. Confirmed against the
 // real 19 light.* entities in HA — room prefixes are: bedroom, kitchen,
 // living_room, laundry, bathroom, front_door.
 //
 // Switches are placed via the curated SWITCH_ROOM_OVERRIDE map (explicit,
-// not derived) — per-room SensorState is still deferred per CLAUDE.md, so
-// every room's sensors come back [] until that data layer exists.
+// not derived). Sensors: Netatmo indoor modules (temp/humidity/CO₂) are wired
+// for kitchen and bedroom via NETATMO_ROOM_SENSORS; every other room's
+// sensors come back [] — the rest of per-room SensorState is still deferred
+// per CLAUDE.md.
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomLights = new Map<string, LightState[]>();
   const roomSwitches = new Map<string, SwitchState[]>();
@@ -250,7 +301,11 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
     }
   }
 
-  const roomSlugs = new Set([...roomLights.keys(), ...roomSwitches.keys()]);
+  const roomSlugs = new Set([
+    ...roomLights.keys(),
+    ...roomSwitches.keys(),
+    ...Object.keys(NETATMO_ROOM_SENSORS),
+  ]);
   return Array.from(roomSlugs).map((slug) => {
     const lights = roomLights.get(slug) ?? [];
     return {
@@ -258,7 +313,7 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
       name: roomNameFromSlug(slug),
       lights,
       switches: roomSwitches.get(slug) ?? [],
-      sensors: [],
+      sensors: netatmoSensorsForRoom(states, slug),
       roomBrightness: computeRoomBrightness(lights),
     };
   });

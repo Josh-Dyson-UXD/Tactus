@@ -1,5 +1,5 @@
 import { Thermometer, Droplets, Wind } from "lucide-react";
-import type { Room, OutdoorState, IndoorState, AQISensor } from "@/types";
+import type { Room, OutdoorState, IndoorState, AQISensor, CO2Sensor } from "@/types";
 
 function avg(nums: number[]) { return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null; }
 
@@ -21,11 +21,13 @@ function EnvMetric({ icon, value, unit, label, color }: { icon: React.ReactNode;
 export function EnvironmentBar({ rooms, indoor, outdoor }: { rooms: Room[]; indoor: IndoorState; outdoor: OutdoorState }) {
   const allSensors = rooms.flatMap((r) => r.sensors);
 
-  // AQI/CO2 still come from per-room Matter sensors (deferred/empty per
-  // CLAUDE.md — not part of this task). Temp/humidity now come from the
-  // dedicated indoor sensor entity instead of an averaged room sensor array.
+  // AQI still comes from per-room Matter sensors (deferred/empty per
+  // CLAUDE.md — not part of this task). Temp/humidity come from the
+  // dedicated indoor sensor entity, not an averaged room sensor array. CO₂
+  // comes from the Netatmo per-room sensors (kitchen + bedroom) now that
+  // that data layer is wired up — kids_room temp/humidity is untouched.
   const aqis = allSensors.filter((s) => s.data.kind === "aqi").map((s) => (s.data as AQISensor).aqi);
-  const co2s = allSensors.filter((s) => s.data.kind === "aqi").map((s) => (s.data as AQISensor).co2);
+  const co2s = allSensors.filter((s) => s.data.kind === "co2").map((s) => (s.data as CO2Sensor).co2);
 
   const indoorTemp  = indoor.tempC;
   const indoorHumid = indoor.humidityPct;

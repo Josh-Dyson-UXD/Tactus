@@ -11,9 +11,9 @@ import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
   mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapHAStatesToIndoor, mapLightEntity, mapSwitchEntity, computeRoomBrightness, hexToRgb,
   mapHAStatesToAutomations, mapHAStatesToScenes, mapAutomationEntity, mapSceneEntity,
-  HA_ENTITIES, TESLA_CONTROL_ENTITY,
+  HA_ENTITIES, TESLA_CONTROL_ENTITY, NETATMO_ROOM_SENSORS,
   isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isIndoorEntity, isSwitchEntity,
-  isAutomationEntity, isSceneEntity,
+  isAutomationEntity, isSceneEntity, isNetatmoEntity, netatmoSensorsForRoom,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
@@ -267,6 +267,12 @@ export default function App() {
         setHomeLoad(mapHAStatesToHomeLoad(states));
       } else if (isIndoorEntity(entityId)) {
         setIndoor(mapHAStatesToIndoor(states));
+      } else if (isNetatmoEntity(entityId)) {
+        setRooms((prev) => prev.map((r) =>
+          NETATMO_ROOM_SENSORS[r.id]
+            ? { ...r, sensors: netatmoSensorsForRoom(statesRef.current, r.id) }
+            : r
+        ));
       } else if (isAutomationEntity(entityId)) {
         const pending = automationPendingRef.current.get(entityId);
         if (pending) { clearTimeout(pending); automationPendingRef.current.delete(entityId); }

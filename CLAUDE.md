@@ -45,7 +45,9 @@ flagged decision (see "Design rules" and the Energy-view precedent below).
 - Data modelling unchanged in shape from the original design import:
   `LightState`, `SwitchState`, `SensorState`, `SolarState`, `PowerwallState`,
   `GridState`, `TeslaState`, `Room`, plus newer additions `AutomationState`,
-  `SceneState`, `IndoorState`, `HomeLoadState`.
+  `SceneState`, `IndoorState`, `HomeLoadState`. `SensorState`'s discriminated
+  union gained a `co2` kind (2026-07-22) for the Netatmo CO₂ ppm reading —
+  kept separate from `aqi` since it isn't an AQI/PM2.5 metric.
 
 ## Build order (historical — all steps below are done)
 
@@ -162,11 +164,27 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
   - `weather.forecast_home` → `OutdoorState`. No AQI/PM2.5 source — still 0.
   - `sensor.kids_room_kids_temperature_*` → `IndoorState` — the ONE indoor
     temp/humidity reading, standing in for the whole house. Not per-room.
+  - **Netatmo Smart Weather Station** (2 indoor modules, confirmed
+    2026-07-22) → per-room `SensorState` via `NETATMO_ROOM_SENSORS` in
+    `ha-types.ts`:
+    `sensor.kitchen_kitchen_{temperature,humidity,carbon_dioxide}` (Kitchen,
+    battery add-on module) and
+    `sensor.bedroom_bedroom_{temperature,humidity,carbon_dioxide}` (Bedroom,
+    mains base station). Core three only — temp/humidity/CO₂;
+    noise/pressure/battery/connectivity intentionally unmapped. Cloud-polled
+    (~10 min), no local push — infrequent `state_changed` events here are
+    expected, not a bug. No `temp_trend` attribute is exposed, so trend is
+    hardcoded "stable". `sensor.bedroom_bedroom_switch` is deliberately
+    excluded (a different device's battery — no Netatmo attribution). Also
+    feeds the `EnvironmentBar` Indoor **CO₂** metric; `kids_room` stays the
+    Indoor temp/humidity source (kept alongside, not replaced).
 
 - **Deferred — still not available in HA:**
   - `SwitchState`: one curated entry exists (above); no broader plug rollout.
-  - Per-room `SensorState` (motion/temp/humidity/AQI) is still not wired into
-    room cards, but the underlying blocker has partially cleared: your
+  - Per-room `SensorState` (motion/temp/humidity/AQI): temp/humidity/CO₂ are
+    now wired for the Kitchen & Bedroom Netatmo modules (see above). Motion
+    and the wider MYGGSPRAY/Matter environmental sensors remain unwired, but
+    the underlying blocker has partially cleared for the MYGGSPRAY ones: your
     **MYGGSPRAY sensors (bathroom, front door) now report reliably in HA**
     via `dirigera_platform`. Wiring them into `SensorCard`/`Room.sensors` is
     real, available work whenever it's prioritized — it's no longer blocked
@@ -328,9 +346,12 @@ annoyance.
 - **Nest doorbell/camera** — no decision taken. Events-only (doorbell press/
   motion/person) was the recommendation; full video was advised against for
   this specific device (battery-powered, WebRTC-only, no HA recording).
-- **Per-room SensorState** — no longer blocked (MYGGSPRAY bathroom/front door
-  report fine in HA) but not yet wired into `SensorCard`/room UI. Real,
-  available work whenever it's a priority.
+- **Per-room SensorState** — temp/humidity/CO₂ now wired for Kitchen &
+  Bedroom via the Netatmo Smart Weather Station (confirmed 2026-07-22).
+  Motion is still unwired everywhere. MYGGSPRAY (bathroom/front door) is no
+  longer blocked (reports fine in HA) but not yet wired into
+  `SensorCard`/room UI beyond Netatmo — real, available work whenever it's
+  a priority.
 - Single App Mode — revisit if manually re-arming Guided Access after
   reboots/updates becomes a recurring annoyance.
 

@@ -28,6 +28,13 @@ export function humidLabel(h: number) {
   return              { label: "Humid",       color: "#3B82F6" };
 }
 
+// Thresholds match EnvironmentBar's co2Color (green < 800, amber < 1200, else pink).
+export function co2Label(ppm: number) {
+  if (ppm < 800)  return { label: "Fresh",     color: "#22C55E" };
+  if (ppm < 1200) return { label: "Elevated",  color: "#F59E0B" };
+  return                 { label: "Ventilate", color: "#FB7185" };
+}
+
 // Blackbody-radiation approximation (Tanner Helland's algorithm) — converts a
 // colour temperature in Kelvin to the RGB a human eye perceives it as. Used
 // to render colour-temp-only lights' real min/max_color_temp_kelvin range as
