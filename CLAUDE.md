@@ -247,6 +247,41 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
     card" — battery cameras can't sustain always-on streaming and would fight
     the wall-panel use case. No action taken either way.
 
+## Idle screen (ambient standby)
+
+After `IDLE_TIMEOUT_MS` (3 min, `App.tsx`) of no pointer/key activity
+anywhere on the panel, a full-screen overlay (`IdleScreen.tsx`) fades in on
+top of whatever view was showing — house, a room, Energy, or Automations —
+regardless of `mainView`. Tapping anywhere wakes it (`onWake` just clears
+the `idle` flag), returning to exactly the same `mainView`/`selectedRoomId`
+underneath, since the overlay never touches that state.
+
+Purely presentational: a large `HH:MM` clock, one status line (greeting +
+lock summary + lights-on count), and five glance columns (Indoor, Outdoor,
+Solar, Battery, Elsa) derived entirely from state `App.tsx` already holds —
+no new HA entities, no data-layer changes. Colour is the resting exception:
+everything is quiet grey/white by default, and only surfaces amber when
+indoor CO₂ ≥ 800ppm or the car is unlocked. Dims (`brightness(0.6)`) between
+22:00–06:00 for night viewing, and drifts a few px over ~4 minutes
+(`motion/react`) for ambience and anti-image-retention on the always-on
+panel.
+
+**Font note:** the clock needs a true Geist Mono weight 300, not a
+synthetically-bolded 400/600. `fonts.css` self-hosts weights 300 and 600 as
+local `.woff2` files (`public/fonts/`) rather than depending on a Google
+Fonts CDN fetch at runtime — more robust for an always-on kiosk that's
+otherwise local-network-only per "Deployment" above, and confirmed via
+`document.fonts` that both weights actually reach `status: "loaded"` (a
+remote `@import` was tried first and silently failed to apply the 300
+weight in one test environment, which is what surfaced the need for this).
+
+**Not built yet:**
+- Per-cluster deep-links on tap (e.g. tapping the Solar column jumping
+  straight to Energy) — currently any tap just wakes to the underlying view.
+- Sunset-based dimming instead of the fixed 22:00–06:00 clock window.
+- A forecast glance — would need HA's `weather.get_forecasts` service call,
+  not just the current-conditions state `OutdoorState` already reads.
+
 ## Design rules — do not violate these
 
 - **No raw hex in components.** Every colour is a `--tactus-*` token.
