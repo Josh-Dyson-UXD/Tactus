@@ -40,7 +40,8 @@ export type TempSensor     = { kind: "temp";     tempC: number; trend: "up" | "d
 export type HumidSensor    = { kind: "humidity"; humidity: number };
 export type AQISensor      = { kind: "aqi";      aqi: number; co2: number; pm25: number };
 export type CO2Sensor      = { kind: "co2";      co2: number };
-export type SensorPayload  = MotionSensor | TempSensor | HumidSensor | AQISensor | CO2Sensor;
+export type PM25Sensor     = { kind: "pm25";     pm25: number };
+export type SensorPayload  = MotionSensor | TempSensor | HumidSensor | AQISensor | CO2Sensor | PM25Sensor;
 export type SensorState    = { id: string; device: string; type: "sensor"; data: SensorPayload };
 
 // ─── Energy / vehicle state types ─────────────────────────────────────────────

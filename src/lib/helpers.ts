@@ -35,6 +35,13 @@ export function co2Label(ppm: number) {
   return                 { label: "Ventilate", color: "#FB7185" };
 }
 
+// EPA-ish 3-band on µg/m³. Thresholds match EnvironmentBar's pm25Color.
+export function pm25Label(v: number) {
+  if (v <= 12) return { label: "Clean",    color: "#22C55E" };
+  if (v <= 35) return { label: "Moderate", color: "#F59E0B" };
+  return             { label: "Poor",     color: "#FB7185" };
+}
+
 // Blackbody-radiation approximation (Tanner Helland's algorithm) — converts a
 // colour temperature in Kelvin to the RGB a human eye perceives it as. Used
 // to render colour-temp-only lights' real min/max_color_temp_kelvin range as

@@ -11,9 +11,9 @@ import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
   mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapHAStatesToIndoor, mapLightEntity, mapSwitchEntity, computeRoomBrightness, hexToRgb,
   mapHAStatesToAutomations, mapHAStatesToScenes, mapAutomationEntity, mapSceneEntity,
-  HA_ENTITIES, TESLA_CONTROL_ENTITY, NETATMO_ROOM_SENSORS,
+  HA_ENTITIES, TESLA_CONTROL_ENTITY, INDOOR_AIR_SENSORS,
   isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isIndoorEntity, isSwitchEntity,
-  isAutomationEntity, isSceneEntity, isNetatmoEntity, netatmoSensorsForRoom,
+  isAutomationEntity, isSceneEntity, isIndoorAirEntity, indoorAirSensorsForRoom,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
@@ -267,10 +267,10 @@ export default function App() {
         setHomeLoad(mapHAStatesToHomeLoad(states));
       } else if (isIndoorEntity(entityId)) {
         setIndoor(mapHAStatesToIndoor(states));
-      } else if (isNetatmoEntity(entityId)) {
+      } else if (isIndoorAirEntity(entityId)) {
         setRooms((prev) => prev.map((r) =>
-          NETATMO_ROOM_SENSORS[r.id]
-            ? { ...r, sensors: netatmoSensorsForRoom(statesRef.current, r.id) }
+          INDOOR_AIR_SENSORS[r.id]
+            ? { ...r, sensors: indoorAirSensorsForRoom(statesRef.current, r.id) }
             : r
         ));
       } else if (isAutomationEntity(entityId)) {
