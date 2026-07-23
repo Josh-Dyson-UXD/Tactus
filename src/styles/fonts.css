@@ -1,1 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Geist+Mono:wght@600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
+
+/* Self-hosted (not Google Fonts CDN): the idle screen's clock needs the true
+   300 weight, and self-hosting removes a runtime dependency on an external
+   CDN for an always-on kiosk that's otherwise local-network-only. */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/geist-mono-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/geist-mono-600.woff2') format('woff2');
+}

@@ -19,6 +19,7 @@ import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
 import { AutomationsView } from "@/components/layout/AutomationsView";
 import { EnergyView } from "@/components/layout/EnergyView";
+import { IdleScreen } from "@/components/layout/IdleScreen";
 
 // Two supported modes (see README "Deployment"):
 //  - Direct-to-HA dev: set both VITE_HA_URL and VITE_HA_TOKEN in .env.local —
@@ -40,6 +41,8 @@ const TESLA_CONTROL_KEYS: TeslaControlKey[] = [
   "steeringWheelHeater", "climatePreset", "climateFanMode", "frunk", "trunk", "windows",
 ];
 const IDLE_TESLA_CONTROL = Object.fromEntries(TESLA_CONTROL_KEYS.map((k) => [k, "idle" as ControlStatus])) as Record<TeslaControlKey, ControlStatus>;
+
+const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 min untouched → idle screen
 
 export default function App() {
   const [rooms, setRooms]           = useState<Room[]>([]);
@@ -65,6 +68,28 @@ export default function App() {
   const closeAutomations = useCallback(() => setMainView("house"), []);
   const openEnergy  = useCallback(() => { setRoomId(null); setMainView("energy"); }, []);
   const closeEnergy = useCallback(() => setMainView("house"), []);
+
+  // Ambient idle screen — fades in after IDLE_TIMEOUT_MS of no pointer/key
+  // activity anywhere on the panel, tap-anywhere to wake back to whatever
+  // view (mainView/selectedRoomId) was already showing underneath it.
+  const [idle, setIdle] = useState(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const reset = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => setIdle(true), IDLE_TIMEOUT_MS);
+    };
+    reset();
+    const onActivity = () => reset();
+    window.addEventListener("pointerdown", onActivity);
+    window.addEventListener("keydown", onActivity);
+    return () => {
+      window.removeEventListener("pointerdown", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
 
   // Full snapshot kept locally so aggregate cards (solar/powerwall/grid/
   // tesla/outdoor, each backed by several entities) can be recomputed from
@@ -548,15 +573,14 @@ export default function App() {
     );
   }
 
+  let content;
   if (mainView === "automations") {
-    return (
+    content = (
       <AutomationsView automations={automations} scenes={scenes} onBack={closeAutomations}
         onToggleAutomation={toggleAutomation} onRunAutomation={triggerAutomation} onActivateScene={activateScene} />
     );
-  }
-
-  if (mainView === "energy") {
-    return (
+  } else if (mainView === "energy") {
+    content = (
       <EnergyView solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} homeLoad={homeLoad} onBack={closeEnergy}
         teslaControl={teslaControl}
         teslaActions={{
@@ -569,26 +593,36 @@ export default function App() {
           honk: handleTeslaHonk, flash: handleTeslaFlash,
         }} />
     );
+  } else {
+    content = (
+      <AnimatePresence mode="wait">
+        {selectedRoom ? (
+          <motion.div key={selectedRoom.id} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
+            <RoomView room={selectedRoom} onBack={() => setRoomId(null)} onUpdateRoom={(p) => updateRoom(selectedRoom.id, p)}
+              onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} onLightColorTemp={handleLightColorTemp}
+              onSwitchToggle={handleSwitchToggle} />
+          </motion.div>
+        ) : (
+          <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
+            <HouseView rooms={rooms} outdoor={outdoor}
+              onNavigate={setRoomId}
+              onOpenAutomations={openAutomations}
+              onOpenEnergy={openEnergy}
+              onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness}
+              onHouseToggle={handleHouseToggle} onHouseBrightness={handleHouseBrightness} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
   }
 
   return (
-    <AnimatePresence mode="wait">
-      {selectedRoom ? (
-        <motion.div key={selectedRoom.id} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
-          <RoomView room={selectedRoom} onBack={() => setRoomId(null)} onUpdateRoom={(p) => updateRoom(selectedRoom.id, p)}
-            onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} onLightColorTemp={handleLightColorTemp}
-            onSwitchToggle={handleSwitchToggle} />
-        </motion.div>
-      ) : (
-        <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
-          <HouseView rooms={rooms} outdoor={outdoor}
-            onNavigate={setRoomId}
-            onOpenAutomations={openAutomations}
-            onOpenEnergy={openEnergy}
-            onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness}
-            onHouseToggle={handleHouseToggle} onHouseBrightness={handleHouseBrightness} />
-        </motion.div>
+    <>
+      {content}
+      {idle && (
+        <IdleScreen rooms={rooms} solar={solar} powerwall={powerwall} tesla={tesla} outdoor={outdoor}
+          onWake={() => setIdle(false)} />
       )}
-    </AnimatePresence>
+    </>
   );
 }
