@@ -715,7 +715,7 @@ export default function App() {
   return (
     <>
       <div style={{ display: "flex", minHeight: "100vh", background: "var(--tactus-bg-base)" }}>
-        <NavRail active={mainView} onNavigate={setMainView} alerts={railAlerts} />
+        <NavRail active={mainView} onNavigate={(v) => { setRoomId(null); setMainView(v); }} alerts={railAlerts} />
         <main style={{ flex: 1, minWidth: 0 }}>{content}</main>
       </div>
       {idle && (
