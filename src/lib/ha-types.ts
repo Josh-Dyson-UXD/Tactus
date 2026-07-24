@@ -293,7 +293,20 @@ export function mapClimateEntity(entity: HAEntity): ClimateState {
   };
 }
 
+// Explicit display-name override for slugs whose title-cased form reads
+// wrong — "living" -> "Living" (not "Living Room") and "front" -> "Front"
+// (not "Front Door"), since both slugs are just the first underscore token
+// of their real light entity_ids (light.living_room_*, light.front_door_*;
+// see the room-slug landmine noted elsewhere in this file). Same explicit-
+// map pattern as SWITCH_ROOM_OVERRIDE. Kitchen/Bedroom/Laundry/Bathroom fall
+// through to the title-cased default unchanged.
+const ROOM_NAME_OVERRIDE: Record<string, string> = {
+  living: "Living Room",
+  front: "Front Door",
+};
+
 function roomNameFromSlug(slug: string): string {
+  if (ROOM_NAME_OVERRIDE[slug]) return ROOM_NAME_OVERRIDE[slug];
   return slug.split("_").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 }
 

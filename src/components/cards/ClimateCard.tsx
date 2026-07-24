@@ -58,12 +58,19 @@ const FAN_LABEL: Record<string, string> = {
   quiet: "Quiet", low: "Low", medium: "Medium", high: "High", auto: "Auto",
 };
 
-export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetFan }: {
+export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetFan, embedded = false }: {
   state: ClimateState;
   onTogglePower: (on: boolean) => void;
   onSetMode: (mode: HvacMode) => void;
   onSetTemp: (temp: number) => void;
   onSetFan: (fan: string) => void;
+  // Embedded mode (RoomView's two-column layout): no self-contained card
+  // chrome, header, or humidity footer — just the stepper/mode/fan controls
+  // inside a plain section container, with an external device-name +
+  // mode-status label above it (RoomView's "Air" card already covers
+  // humidity, and the section label already covers the device name/status
+  // that the standalone header used to show).
+  embedded?: boolean;
 }) {
   const { device, mode, hvacModes, currentTemp, targetTemp, currentHumidity, minTemp, maxTemp, step, fanMode, fanModes, status } = state;
   const isOff = mode === "off";
@@ -96,36 +103,8 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
 
   const disabled = isOff || isPending || isError;
 
-  return (
-    <div className="relative flex flex-col p-6 rounded-tactus-2xl w-full" style={{
-      background: isOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)",
-      border: isError ? `1px solid ${withAlpha(RED_HEX, 0.4)}` : isOff ? "1px solid var(--tactus-border-default)" : `1px solid ${withAlpha(accentHex, 0.25)}`,
-      boxShadow: !isOff && !isError ? `0 16px 40px 0 ${withAlpha(accentHex, 0.08)}` : "none",
-    }}>
-      {/* Header */}
-      <div className="flex items-center justify-between w-full mb-6">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center rounded-tactus-md size-[40px]" style={{ background: withAlpha(accentHex, isOff ? 0.06 : 0.13), animation: pulse }}>
-            {isError
-              ? <div className="size-[18px]"><AlertIcon stroke="var(--tactus-red)" /></div>
-              : isOff
-                ? <Power size={18} color="var(--tactus-text-muted)" />
-                : (() => { const Icon = MODE_ICON[mode as Exclude<HvacMode, "off">]; return <Icon size={18} color={accent} />; })()}
-          </div>
-          <div className="flex flex-col gap-[2px]">
-            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-secondary)" : "var(--tactus-text-primary)" }}>{device}</p>
-            <p className="text-[12px] leading-none mt-[2px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Living Room</p>
-          </div>
-        </div>
-        <button className="flex items-center px-[10px] py-[4px] rounded-full relative cursor-pointer disabled:cursor-default" style={{ background: withAlpha(accentHex, isOff ? 0.06 : 0.13), animation: pulse }}
-          disabled={isPending} onClick={() => onTogglePower(isOff)}>
-          <div aria-hidden className="absolute inset-0 rounded-full pointer-events-none" style={{ border: `1px solid ${withAlpha(accentHex, 0.25)}` }} />
-          <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>
-            {isError ? "ERROR" : isPending ? "SYNCING" : ACTION_LABEL[mode]}
-          </p>
-        </button>
-      </div>
-
+  const controls = (
+    <>
       {/* Stepper */}
       <div className="flex items-center justify-center gap-6 mb-6" style={{ opacity: isOff ? 0.4 : 1, pointerEvents: isOff ? "none" : "auto" }}>
         <button className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-default" style={{ width: 52, height: 52, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}
@@ -168,7 +147,7 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
 
       {/* Fan row — a segmented control, deliberately different shape from the mode tiles above */}
       {fanModes.length > 0 && (
-        <div className="flex items-center gap-3 mb-6" style={{ opacity: isOff ? 0.4 : 1, pointerEvents: isOff ? "none" : "auto" }}>
+        <div className="flex items-center gap-3" style={{ opacity: isOff ? 0.4 : 1, pointerEvents: isOff ? "none" : "auto" }}>
           <p className="text-[10px] font-bold uppercase tracking-wider shrink-0" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-faint)" }}>Fan</p>
           <div className="flex items-center flex-1 p-[3px] rounded-full" style={{ background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
             {fanModes.map((f) => {
@@ -184,9 +163,61 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex flex-col gap-3 w-full">
+        <div className="flex items-center justify-between">
+          <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--tactus-text-faint)" }}>{device}</p>
+          <button className="cursor-pointer disabled:cursor-default" disabled={isPending} onClick={() => onTogglePower(isOff)} style={{ animation: pulse }}>
+            <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>
+              {isError ? "ERROR" : isPending ? "SYNCING" : ACTION_LABEL[mode]}
+            </p>
+          </button>
+        </div>
+        <div className="rounded-tactus-xl p-6" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
+          {controls}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex flex-col p-6 rounded-tactus-2xl w-full" style={{
+      background: isOff ? "var(--tactus-bg-base)" : "var(--tactus-bg-raised)",
+      border: isError ? `1px solid ${withAlpha(RED_HEX, 0.4)}` : isOff ? "1px solid var(--tactus-border-default)" : `1px solid ${withAlpha(accentHex, 0.25)}`,
+      boxShadow: !isOff && !isError ? `0 16px 40px 0 ${withAlpha(accentHex, 0.08)}` : "none",
+    }}>
+      {/* Header */}
+      <div className="flex items-center justify-between w-full mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center rounded-tactus-md size-[40px]" style={{ background: withAlpha(accentHex, isOff ? 0.06 : 0.13), animation: pulse }}>
+            {isError
+              ? <div className="size-[18px]"><AlertIcon stroke="var(--tactus-red)" /></div>
+              : isOff
+                ? <Power size={18} color="var(--tactus-text-muted)" />
+                : (() => { const Icon = MODE_ICON[mode as Exclude<HvacMode, "off">]; return <Icon size={18} color={accent} />; })()}
+          </div>
+          <div className="flex flex-col gap-[2px]">
+            <p className="text-[16px] font-semibold leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-secondary)" : "var(--tactus-text-primary)" }}>{device}</p>
+            <p className="text-[12px] leading-none mt-[2px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Living Room</p>
+          </div>
+        </div>
+        <button className="flex items-center px-[10px] py-[4px] rounded-full relative cursor-pointer disabled:cursor-default" style={{ background: withAlpha(accentHex, isOff ? 0.06 : 0.13), animation: pulse }}
+          disabled={isPending} onClick={() => onTogglePower(isOff)}>
+          <div aria-hidden className="absolute inset-0 rounded-full pointer-events-none" style={{ border: `1px solid ${withAlpha(accentHex, 0.25)}` }} />
+          <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>
+            {isError ? "ERROR" : isPending ? "SYNCING" : ACTION_LABEL[mode]}
+          </p>
+        </button>
+      </div>
+
+      {controls}
 
       {/* Footer */}
-      <div className="flex items-center justify-end pt-4" style={{ borderTop: "1px solid var(--tactus-border-default)" }}>
+      <div className="flex items-center justify-end pt-4 mt-6" style={{ borderTop: "1px solid var(--tactus-border-default)" }}>
         <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>
           {currentHumidity !== null ? `${currentHumidity}% humidity` : "—"}
         </p>

@@ -87,16 +87,20 @@ src/
     App.tsx                 # HA connection lifecycle, control state, view routing
   components/
     cards/
-      LightCard.tsx / SwitchCard.tsx / SensorCard.tsx (stubbed, unused)
+      LightCard.tsx / SwitchCard.tsx / SensorCard.tsx (unused since Phase 2's
+        RoomView restyle — left for reference, may remove in a cleanup pass)
       SolarCard.tsx / PowerwallCard.tsx / TeslaCard.tsx / EnergyFlowCard.tsx
-      RoomCard.tsx / AutomationCard.tsx / SceneCard.tsx / ClimateCard.tsx
+      RoomCard.tsx / AutomationCard.tsx / SceneCard.tsx
+      ClimateCard.tsx            # standalone + embedded mode (RoomView's two-column layout)
+      LightSheet.tsx             # deep light control overlay (redesign Phase 2)
     controls/
-      BrightnessSlider.tsx / ColorTempSlider.tsx / RoomControls.tsx
+      BrightnessSlider.tsx / ColorTempSlider.tsx / RoomControls.tsx (unused
+        since Phase 2 — RoomView now builds its own slim brightness bar)
     layout/
       NavRail.tsx              # persistent left nav rail (redesign Phase 1) — the app shell
       HomeView.tsx              # new minimal Home landing (redesign Phase 1)
       DevicesStub.tsx            # Phase 1 placeholder; real board is Phase 3
-      RoomView.tsx               # unrestyled — Phase 2
+      RoomView.tsx               # restyled (Phase 2) — see "UI redesign" below
       EnergyView.tsx             # unrestyled — Phase 4; Solar/Powerwall/Tesla/EnergyFlow
       AutomationsView.tsx        # unrestyled — Phase 4; automations + scenes
       HouseView.tsx / EnvironmentBar.tsx  # superseded by NavRail+HomeView (Phase 1);
@@ -308,16 +312,16 @@ weight in one test environment, which is what surfaced the need for this).
 - A forecast glance — would need HA's `weather.get_forecasts` service call,
   not just the current-conditions state `OutdoorState` already reads.
 
-## UI redesign — persistent shell (Phase 1 of 4, 2026-07-24)
+## UI redesign — persistent shell + room detail (Phases 1–2 of 4)
 
 Tactus is mid-migration from a full-screen-view-swap model to a persistent
-left `NavRail` + content-area shell, plus a new minimal Home landing. This is
-a multi-phase redesign; only Phase 1 (the shell + Home) is done. **Energy,
-Automations, and RoomView are intentionally unrestyled** — they still render
-on their pre-redesign components (`EnergyView.tsx`, `AutomationsView.tsx`,
-`RoomView.tsx`) inside the new shell's content area, and will get their own
-passes in later phases. Don't restyle them opportunistically; that's a
-scoped, separate task per phase.
+left `NavRail` + content-area shell, plus a new minimal Home landing and a
+restyled room detail view. Phases 1 (shell + Home, 2026-07-24) and 2 (room
+detail + light sheet, 2026-07-24) are done. **Energy and Automations are
+still intentionally unrestyled** — they render on their pre-redesign
+components (`EnergyView.tsx`, `AutomationsView.tsx`) inside the new shell's
+content area, and will get their own pass in Phase 4. Don't restyle them
+opportunistically; that's a scoped, separate task per phase.
 
 - **`NavRail.tsx`** — fixed ~66px-wide, full-height left rail, always
   visible regardless of `mainView`. Four tabs: Home/Devices/Energy/
@@ -357,6 +361,43 @@ scoped, separate task per phase.
   alert dot — deliberately higher than the 800ppm amber threshold used on
   Home's room-row CO₂ callouts (`EnvironmentBar`'s `co2Color`), so the rail
   isn't lit for every mildly-stuffy room, only a genuine "ventilate" case.
+
+### Phase 2 — room detail + light sheet (2026-07-24)
+
+- **`RoomView.tsx`** restyled to the same minimal language: header (back
+  chevron + breadcrumb + name, All Off/All On pills) → a slim room-master
+  brightness bar (lights-only rooms) → an **Air** card, full-width, showing
+  whichever of temp/humidity/CO₂/PM2.5 the room actually has (reuses
+  `co2Label`/`pm25Label` from `helpers.ts` and a local `tempColor`/
+  `humidColor` pair matching `EnvironmentBar`'s) → a two-column row for
+  rooms with climate (Lights & plugs ~1.15fr left, Climate ~1fr right) or a
+  single Lights & plugs column for rooms without. Light rows use a
+  functional sliding toggle (independent `stopPropagation`, doesn't also
+  open the sheet) plus a tap-to-open chevron; switch rows are toggle-only,
+  no chevron (no deep controls exist for a plain switch).
+- **`ClimateCard.tsx`** gained an `embedded?: boolean` prop for RoomView's
+  two-column layout: no self-contained chrome/glow, no header, no humidity
+  footer (humidity now lives in the Air card) — just the stepper/mode/fan
+  controls inside a plain `--tactus-bg-recessed` section, with the device
+  name + live mode-status label (HEATING/COOLING/…, also the power toggle)
+  rendered externally by the same component before the controls container.
+  Standalone (non-embedded) usage is unchanged.
+- **`LightSheet.tsx`** (new) — the deep light control, opened from a
+  RoomView light row via local `openLightId` state. Capability-aware off
+  `LightState.colorMode` exactly like the (now-unused) `LightCard`: always
+  shows brightness; `"rgb"` adds the `COLORS` swatch row; `"temp"` adds
+  `ColorTempSlider` built from the device's real `colorTempRange`;
+  `"brightness"` gets neither. Debounced 400ms on both brightness and
+  colour-temp (local optimistic shadow, same pattern as `RoomCard`'s
+  brightness) — a drag must fire one service call, not one per pixel.
+- **`ROOM_NAME_OVERRIDE`** (`ha-types.ts`) — explicit display-name map
+  (`living` → "Living Room", `front` → "Front Door"), same pattern as
+  `SWITCH_ROOM_OVERRIDE`, applied inside `roomNameFromSlug` so the prettier
+  names flow everywhere (Home's room list, RoomView's header) without a
+  separate lookup at each call site.
+- `LightCard.tsx`, `SensorCard.tsx`, `RoomControls.tsx` are now unused
+  (RoomView no longer renders them) — left in place for reference, may be
+  removed in a later cleanup pass.
 
 ## Design rules — do not violate these
 
