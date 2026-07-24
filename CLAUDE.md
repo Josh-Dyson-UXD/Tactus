@@ -52,7 +52,11 @@ flagged decision (see "Design rules" and the Energy-view precedent below).
   kind (2026-07-23) for the Living Room IKEA air-quality sensor's PM2.5
   reading, since Netatmo's kitchen/bedroom modules don't report PM2.5.
   The dedicated `IndoorState` type is retired (2026-07-23) — see "Entity
-  mapping" below.
+  mapping" below. `ClimateState`/`HvacMode` added (2026-07-23) for the
+  Living Room Sensibo split system — the first real per-room climate
+  control (Tesla's `climate.ghost_climate` stays handled inside
+  `TeslaCard`, a separate concept). `Room` gained a `climate: ClimateState[]`
+  field alongside `sensors`.
 
 ## Build order (historical — all steps below are done)
 
@@ -163,6 +167,24 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
   - One curated switch: `switch.kids_room_usb_lamp` — physically a Living
     Room lamp despite its entity_id/HA area; placed via `SWITCH_ROOM_OVERRIDE`
     in `ha-types.ts`, not derived. Only entry so far.
+  - **Climate — Living Room Sensibo split system** (confirmed 2026-07-23):
+    `climate.josh_s_device_split_system`, placed via `CLIMATE_ROOM_OVERRIDE`
+    in `ha-types.ts` (same curated-single-entry pattern as the switch above),
+    keyed to the Living Room lights' slug `living` since the entity_id
+    doesn't encode a room. `isClimateEntity` matches only this one id — never
+    a `climate.*` prefix, which would wrongly catch `climate.ghost_climate`
+    (the Tesla's, handled separately inside `TeslaCard`). Scope is
+    thermostat-only: on/off, HVAC mode (`hvac_modes`: cool/heat/dry/
+    heat_cool/fan_only/off), target temp via `set_temperature`
+    (`min_temp`/`max_temp`/`target_temp_step` from the entity), fan speed via
+    `set_fan_mode` (`fan_modes`: quiet/low/medium/high/auto), and a
+    current-temp/humidity readout. Control rides the same pending → confirmed
+    cycle as switches (`climatePendingRef` in `App.tsx`, `ClimateCard`'s
+    `status`). The temperature stepper is debounced 400ms (`ClimateCard`'s
+    local optimistic `targetTemp` shadow, same pattern as `RoomCard`'s
+    brightness) — don't call `set_temperature` per tap. Deferred Sensibo
+    extras, real available future work: Climate React, Timer, swing
+    position, filter clean/reset, firmware info.
   - **Automations & scenes are dynamically discovered**, not a curated list —
     anything matching `automation.*`/`scene.*` is picked up automatically,
     inserted (not just patched) if it appears after initial load.

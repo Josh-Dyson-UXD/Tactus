@@ -3,17 +3,17 @@ import { motion, AnimatePresence } from "motion/react";
 import type {
   Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, Color,
   ControlStatus, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
-  AutomationState, SceneState, MainView,
+  AutomationState, SceneState, MainView, ClimateState, HvacMode,
 } from "@/types";
 import { HAClient, mergeStates } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
 import {
   mapHAStatesToRooms, mapHAStatesToSolar, mapHAStatesToPowerwall, mapHAStatesToGrid,
-  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapLightEntity, mapSwitchEntity, computeRoomBrightness, hexToRgb,
+  mapHAStatesToTesla, mapHAStatesToOutdoor, mapHAStatesToHomeLoad, mapLightEntity, mapSwitchEntity, mapClimateEntity, computeRoomBrightness, hexToRgb,
   mapHAStatesToAutomations, mapHAStatesToScenes, mapAutomationEntity, mapSceneEntity,
   HA_ENTITIES, TESLA_CONTROL_ENTITY, INDOOR_AIR_SENSORS,
   isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isSwitchEntity,
-  isAutomationEntity, isSceneEntity, isIndoorAirEntity, indoorAirSensorsForRoom,
+  isAutomationEntity, isSceneEntity, isIndoorAirEntity, indoorAirSensorsForRoom, isClimateEntity,
 } from "@/lib/ha-types";
 import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
@@ -100,6 +100,7 @@ export default function App() {
   const teslaPendingRef = useRef<Map<TeslaControlKey, ReturnType<typeof setTimeout>>>(new Map());
   const automationPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const switchPendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const climatePendingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Guards for rehydrate() below. hydrationGenRef lets a slower, now-
   // superseded rehydrate (e.g. two WS auth_oks in quick succession) detect
@@ -154,6 +155,8 @@ export default function App() {
       lightPendingRef.current.clear();
       switchPendingRef.current.forEach(clearTimeout);
       switchPendingRef.current.clear();
+      climatePendingRef.current.forEach(clearTimeout);
+      climatePendingRef.current.clear();
       automationPendingRef.current.forEach(clearTimeout);
       automationPendingRef.current.clear();
       teslaPendingRef.current.forEach(clearTimeout);
@@ -262,6 +265,16 @@ export default function App() {
             ? { ...r, switches: r.switches.map((s) => (s.id === entityId ? updated : s)) }
             : r
         )));
+      } else if (isClimateEntity(entityId)) {
+        const pending = climatePendingRef.current.get(entityId);
+        if (pending) { clearTimeout(pending); climatePendingRef.current.delete(entityId); }
+
+        const updated = mapClimateEntity(entity);
+        setRooms((prev) => prev.map((r) => (
+          r.climate.some((c) => c.id === entityId)
+            ? { ...r, climate: r.climate.map((c) => (c.id === entityId ? updated : c)) }
+            : r
+        )));
       } else if (isSolarEntity(entityId)) {
         setSolar(mapHAStatesToSolar(states));
       } else if (isPowerwallEntity(entityId)) {
@@ -336,6 +349,8 @@ export default function App() {
       automationPendingRef.current.clear();
       switchPendingRef.current.forEach(clearTimeout);
       switchPendingRef.current.clear();
+      climatePendingRef.current.forEach(clearTimeout);
+      climatePendingRef.current.clear();
     };
   }, [rehydrate]);
 
@@ -406,6 +421,35 @@ export default function App() {
     }, PENDING_TIMEOUT_MS);
     switchPendingRef.current.set(entityId, timeout);
   }, [setSwitchStatus]);
+
+  // ─── Climate control: same pending → confirmed cycle as switches ────────
+  // One curated entity (the Sensibo split system) — see CLIMATE_ROOM_OVERRIDE
+  // in ha-types.ts. Distinct HA services per control (temp/mode/fan/power)
+  // rather than a single call_service, since each maps to a different
+  // Sensibo/climate.* service.
+  const setClimateStatus = useCallback((entityId: string, status: "pending" | "error") => {
+    setRooms((prev) => prev.map((r) =>
+      r.climate.some((c) => c.id === entityId)
+        ? { ...r, climate: r.climate.map((c) => (c.id === entityId ? { ...c, status } : c)) }
+        : r
+    ));
+  }, []);
+
+  const controlClimate = useCallback((entityId: string, service: string, data: Record<string, unknown>) => {
+    const client = clientRef.current;
+    if (!client) return;
+    const existing = climatePendingRef.current.get(entityId);
+    if (existing) clearTimeout(existing);
+    setClimateStatus(entityId, "pending");
+    client.callService("climate", service, data, { entity_id: entityId });
+    const t = setTimeout(() => { climatePendingRef.current.delete(entityId); setClimateStatus(entityId, "error"); }, PENDING_TIMEOUT_MS);
+    climatePendingRef.current.set(entityId, t);
+  }, [setClimateStatus]);
+
+  const handleClimateTemp  = useCallback((id: string, temp: number) => controlClimate(id, "set_temperature", { temperature: temp }), [controlClimate]);
+  const handleClimateMode  = useCallback((id: string, mode: HvacMode) => controlClimate(id, "set_hvac_mode", { hvac_mode: mode }), [controlClimate]);
+  const handleClimateFan   = useCallback((id: string, fan: string)  => controlClimate(id, "set_fan_mode", { fan_mode: fan }), [controlClimate]);
+  const handleClimatePower = useCallback((id: string, on: boolean)  => controlClimate(id, on ? "turn_on" : "turn_off", {}), [controlClimate]);
 
   // Room-level bulk toggle/brightness: no separate room-level pending state —
   // each affected light (and, for on/off, each switch) fires its own
@@ -600,7 +644,8 @@ export default function App() {
           <motion.div key={selectedRoom.id} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
             <RoomView room={selectedRoom} onBack={() => setRoomId(null)} onUpdateRoom={(p) => updateRoom(selectedRoom.id, p)}
               onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} onLightColorTemp={handleLightColorTemp}
-              onSwitchToggle={handleSwitchToggle} />
+              onSwitchToggle={handleSwitchToggle}
+              onClimatePower={handleClimatePower} onClimateMode={handleClimateMode} onClimateTemp={handleClimateTemp} onClimateFan={handleClimateFan} />
           </motion.div>
         ) : (
           <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>

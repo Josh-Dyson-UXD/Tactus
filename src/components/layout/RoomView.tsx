@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { Room, LightState, Color } from "@/types";
+import type { Room, LightState, Color, HvacMode } from "@/types";
 import { withAlpha } from "@/lib/helpers";
 import { ChevronLeft } from "@/components/icons";
 import { RoomControls } from "@/components/controls/RoomControls";
@@ -7,18 +7,23 @@ import { SectionHeading } from "@/components/layout/SectionHeading";
 import { LightCard } from "@/components/cards/LightCard";
 import { SwitchCard } from "@/components/cards/SwitchCard";
 import { SensorCard } from "@/components/cards/SensorCard";
+import { ClimateCard } from "@/components/cards/ClimateCard";
 
 const COMMIT_DELAY = 400;
 
-export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor, onLightColorTemp, onSwitchToggle }: {
+export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBrightness, onLightColor, onLightColorTemp, onSwitchToggle, onClimatePower, onClimateMode, onClimateTemp, onClimateFan }: {
   room: Room; onBack: () => void; onUpdateRoom: (p: Partial<Room>) => void;
   onLightToggle: (entityId: string, on: boolean) => void;
   onLightBrightness: (entityId: string, v: number) => void;
   onLightColor: (entityId: string, c: Color) => void;
   onLightColorTemp: (entityId: string, kelvin: number) => void;
   onSwitchToggle: (entityId: string, on: boolean) => void;
+  onClimatePower: (entityId: string, on: boolean) => void;
+  onClimateMode: (entityId: string, mode: HvacMode) => void;
+  onClimateTemp: (entityId: string, temp: number) => void;
+  onClimateFan: (entityId: string, fan: string) => void;
 }) {
-  const { lights, switches, sensors, roomBrightness, name } = room;
+  const { lights, switches, sensors, climate, roomBrightness, name } = room;
   const activeCount = lights.filter(l => l.cardState === "on").length + switches.filter(s => s.isOn).length;
   const totalCount  = lights.length + switches.length;
 
@@ -82,6 +87,21 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
       </div>
 
       <div className="p-8 flex flex-col gap-10">
+        {climate.length > 0 && (
+          <div>
+            <SectionHeading label="Climate" count={climate.length} />
+            <div className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", alignItems: "start" }}>
+              {climate.map((c) => (
+                <ClimateCard key={c.id} state={c}
+                  onTogglePower={(on) => onClimatePower(c.id, on)}
+                  onSetMode={(mode) => onClimateMode(c.id, mode)}
+                  onSetTemp={(t) => onClimateTemp(c.id, t)}
+                  onSetFan={(f) => onClimateFan(c.id, f)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         {lights.length > 0 && (
           <div>
             <SectionHeading label="Lights" count={lights.length} />

@@ -2,7 +2,7 @@ import { COLORS } from "@/types";
 import type {
   Room, LightState, LightColorMode, Color, SolarState, PowerwallState, GridState, TeslaState, OutdoorState,
   HomeLoadState, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
-  AutomationState, AutomationRunState, SceneState, SwitchState, SensorState,
+  AutomationState, AutomationRunState, SceneState, SwitchState, SensorState, ClimateState, HvacMode,
 } from "@/types";
 import type { HAEntity, HAStateMap } from "@/lib/ha-client";
 
@@ -36,6 +36,7 @@ export const HA_ENTITIES = {
   teslaWindows: "cover.ghost_windows",
   outdoorWeather: "weather.forecast_home",
   donutSwitch: "switch.kids_room_usb_lamp",
+  climateSplitSystem: "climate.josh_s_device_split_system",
 } as const;
 
 // Explicit switch → room placement, not derived from the HA area/entity_id.
@@ -54,6 +55,18 @@ export const HA_ENTITIES = {
 const SWITCH_ROOM_OVERRIDE: Record<string, string> = {
   [HA_ENTITIES.donutSwitch]: "living",
 };
+
+// Curated placement — its entity_id ("josh_s_device_split_system") doesn't
+// derive a room, same as the donut switch. Keyed to the Living Room lights'
+// slug `living`. Deliberately a curated single-entry map, not a prefix match
+// (climate.*) — a prefix match would wrongly catch climate.ghost_climate,
+// the Tesla's own climate entity, which stays handled inside TeslaCard.
+const CLIMATE_ROOM_OVERRIDE: Record<string, string> = {
+  [HA_ENTITIES.climateSplitSystem]: "living",
+};
+
+const CLIMATE_IDS = new Set<string>([HA_ENTITIES.climateSplitSystem]);
+export function isClimateEntity(id: string) { return CLIMATE_IDS.has(id); }
 
 // Indoor air/environment sensors → per-room SensorState. Was a single
 // weather-station-only layer for kitchen/bedroom; now also covers the Living
@@ -254,6 +267,32 @@ export function mapSwitchEntity(entity: HAEntity): SwitchState {
   };
 }
 
+// Per-entity mapper, mirroring mapSwitchEntity — lets the WS handler patch
+// the one curated climate entity in place without recomputing every room.
+// unavailable/unknown collapses to mode "off" + status "error", same
+// red/error convention as everywhere else — HA reports the real hvac_mode
+// in `state` only while the integration is actually reachable.
+export function mapClimateEntity(entity: HAEntity): ClimateState {
+  const a = entity.attributes;
+  const unavailable = entity.state === "unavailable" || entity.state === "unknown";
+  const num = (v: unknown) => (typeof v === "number" ? v : null);
+  return {
+    id: entity.entity_id,
+    device: ((a.friendly_name as string) ?? entity.entity_id).trim(),
+    mode: unavailable ? "off" : ((entity.state as HvacMode) ?? "off"),
+    hvacModes: ((a.hvac_modes as HvacMode[]) ?? []).filter((m) => m !== "off"),
+    currentTemp: a.current_temperature != null ? round(num(a.current_temperature) ?? 0, 1) : null,
+    targetTemp: num(a.temperature),
+    currentHumidity: a.current_humidity != null ? round(num(a.current_humidity) ?? 0, 0) : null,
+    minTemp: (a.min_temp as number) ?? 16,
+    maxTemp: (a.max_temp as number) ?? 31,
+    step: (a.target_temp_step as number) ?? 1,
+    fanMode: (a.fan_mode as string) ?? null,
+    fanModes: (a.fan_modes as string[]) ?? [],
+    status: unavailable ? "error" : "idle",
+  };
+}
+
 function roomNameFromSlug(slug: string): string {
   return slug.split("_").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 }
@@ -309,13 +348,15 @@ export function indoorAirSensorsForRoom(states: HAStateMap, slug: string): Senso
 // living_room, laundry, bathroom, front_door.
 //
 // Switches are placed via the curated SWITCH_ROOM_OVERRIDE map (explicit,
-// not derived). Sensors: indoor air sensors (temp/humidity, optionally CO₂
+// not derived), climate via the curated CLIMATE_ROOM_OVERRIDE map (same
+// pattern). Sensors: indoor air sensors (temp/humidity, optionally CO₂
 // and/or PM2.5) are wired for kitchen, bedroom, living, and laundry via
 // INDOOR_AIR_SENSORS; every other room's sensors come back [] — the rest of
 // per-room SensorState is still deferred per CLAUDE.md.
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomLights = new Map<string, LightState[]>();
   const roomSwitches = new Map<string, SwitchState[]>();
+  const roomClimate = new Map<string, ClimateState[]>();
 
   for (const entity of Object.values(states)) {
     if (isLightEntity(entity.entity_id)) {
@@ -330,12 +371,19 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
       const switches = roomSwitches.get(roomSlug) ?? [];
       switches.push(mapSwitchEntity(entity));
       roomSwitches.set(roomSlug, switches);
+    } else if (isClimateEntity(entity.entity_id)) {
+      const roomSlug = CLIMATE_ROOM_OVERRIDE[entity.entity_id];
+      if (!roomSlug) continue;
+      const climate = roomClimate.get(roomSlug) ?? [];
+      climate.push(mapClimateEntity(entity));
+      roomClimate.set(roomSlug, climate);
     }
   }
 
   const roomSlugs = new Set([
     ...roomLights.keys(),
     ...roomSwitches.keys(),
+    ...roomClimate.keys(),
     ...Object.keys(INDOOR_AIR_SENSORS),
   ]);
   return Array.from(roomSlugs).map((slug) => {
@@ -345,6 +393,7 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
       name: roomNameFromSlug(slug),
       lights,
       switches: roomSwitches.get(slug) ?? [],
+      climate: roomClimate.get(slug) ?? [],
       sensors: indoorAirSensorsForRoom(states, slug),
       roomBrightness: computeRoomBrightness(lights),
     };
