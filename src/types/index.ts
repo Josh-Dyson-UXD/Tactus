@@ -35,6 +35,21 @@ export type SwitchState = {
   status: ControlStatus; // toggle's pending → confirmed cycle, mirrors LightState's cardState pending/error
 };
 
+export type HvacMode = "off" | "heat" | "cool" | "dry" | "fan_only" | "heat_cool";
+
+export type ClimateState = {
+  id: string; device: string;
+  mode: HvacMode;
+  hvacModes: HvacMode[];              // supported modes; "off" is driven by the power toggle, the rest by the mode row
+  currentTemp: number | null;
+  targetTemp: number | null;
+  currentHumidity: number | null;
+  minTemp: number; maxTemp: number; step: number;
+  fanMode: string | null;
+  fanModes: string[];
+  status: ControlStatus;             // idle | pending | error — one per entity, mirrors SwitchState.status
+};
+
 export type MotionSensor   = { kind: "motion";   motionDetected: boolean; lastSeen: string };
 export type TempSensor     = { kind: "temp";     tempC: number; trend: "up" | "down" | "stable" };
 export type HumidSensor    = { kind: "humidity"; humidity: number };
@@ -154,6 +169,6 @@ export type MainView = "house" | "automations" | "energy";
 
 export type Room = {
   id: string; name: string;
-  lights: LightState[]; switches: SwitchState[]; sensors: SensorState[];
+  lights: LightState[]; switches: SwitchState[]; sensors: SensorState[]; climate: ClimateState[];
   roomBrightness: number;
 };

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Room } from "@/types";
+import type { Room, HvacMode } from "@/types";
 import { withAlpha, dominantColor } from "@/lib/helpers";
 import { SunIcon } from "@/components/icons";
 import { BrightnessSlider } from "@/components/controls/BrightnessSlider";
@@ -8,6 +8,20 @@ import { BrightnessSlider } from "@/components/controls/BrightnessSlider";
 type Panel = "summary" | "brightness";
 
 const COMMIT_DELAY = 400;
+
+// Status readout only, not a control — mirrors ClimateCard's mode colours
+// (this card never lets you change climate state, only navigate to it).
+const CLIMATE_MODE_COLOR: Record<HvacMode, string> = {
+  heat: "var(--tactus-amber)",
+  cool: "var(--tactus-blue)",
+  dry: "var(--tactus-blue-light)",
+  fan_only: "var(--tactus-text-secondary)",
+  heat_cool: "var(--tactus-green)",
+  off: "var(--tactus-text-muted)",
+};
+const CLIMATE_MODE_LABEL: Record<HvacMode, string> = {
+  heat: "Heat", cool: "Cool", dry: "Dry", fan_only: "Fan", heat_cool: "Auto", off: "Off",
+};
 
 // Brightness + on/off only — colour selection only ever exists at the
 // individual LightCard level. Different bulbs in a room can support
@@ -18,7 +32,7 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange }: 
   room: Room; onNavigate: () => void; onToggleAll: (on: boolean) => void;
   onBrightnessChange: (v: number) => void;
 }) {
-  const { name, lights, switches, sensors, roomBrightness } = room;
+  const { name, lights, switches, sensors, climate, roomBrightness } = room;
   const [panel, setPanel] = useState<Panel>("summary");
 
   // Local optimistic value + debounce — dragging updates the numeral/thumb
@@ -40,6 +54,7 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange }: 
   const isAnyOn        = !allOff;
   const tempSensor     = sensors.find((s) => s.data.kind === "temp");
   const motionSensor   = sensors.find((s) => s.data.kind === "motion");
+  const climateUnit    = climate[0];
 
   const displayBrightness = localBrightness ?? roomBrightness;
 
@@ -66,6 +81,11 @@ export function RoomCard({ room, onNavigate, onToggleAll, onBrightnessChange }: 
             {activeSwitches > 0 && <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{activeSwitches} plug{activeSwitches > 1 ? "s" : ""}</p>}
             {allOff && <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>All off</p>}
             {tempSensor && tempSensor.data.kind === "temp" && <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>{tempSensor.data.tempC.toFixed(1)}°C</p>}
+            {climateUnit && (
+              <p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: climateUnit.mode === "off" ? "var(--tactus-text-muted)" : CLIMATE_MODE_COLOR[climateUnit.mode] }}>
+                {climateUnit.mode === "off" ? "Off" : `${CLIMATE_MODE_LABEL[climateUnit.mode]} · ${climateUnit.targetTemp ?? "—"}°`}
+              </p>
+            )}
             {motionSensor && motionSensor.data.kind === "motion" && motionSensor.data.motionDetected && (
               <div className="flex items-center gap-1"><div className="size-1.5 rounded-full" style={{ background: "var(--tactus-amber)" }} /><p className="text-[12px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-amber)" }}>Motion</p></div>
             )}
