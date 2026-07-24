@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import type {
   Room, SolarState, PowerwallState, GridState, TeslaState, OutdoorState, HomeLoadState, Color,
   ControlStatus, TeslaControlKey, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset, ClimateFanMode,
-  AutomationState, SceneState, MainView, ClimateState, HvacMode,
+  AutomationState, SceneState, MainView, ClimateState, HvacMode, QuickActionId,
 } from "@/types";
 import { HAClient, mergeStates } from "@/lib/ha-client";
 import type { HAStateMap } from "@/lib/ha-client";
@@ -15,11 +15,13 @@ import {
   isLightEntity, isSolarEntity, isPowerwallEntity, isGridEntity, isTeslaEntity, isOutdoorEntity, isHomeLoadEntity, isSwitchEntity,
   isAutomationEntity, isSceneEntity, isIndoorAirEntity, indoorAirSensorsForRoom, isClimateEntity,
 } from "@/lib/ha-types";
-import { HouseView } from "@/components/layout/HouseView";
 import { RoomView } from "@/components/layout/RoomView";
 import { AutomationsView } from "@/components/layout/AutomationsView";
 import { EnergyView } from "@/components/layout/EnergyView";
 import { IdleScreen } from "@/components/layout/IdleScreen";
+import { NavRail } from "@/components/layout/NavRail";
+import { HomeView } from "@/components/layout/HomeView";
+import { DevicesStub } from "@/components/layout/DevicesStub";
 
 // Two supported modes (see README "Deployment"):
 //  - Direct-to-HA dev: set both VITE_HA_URL and VITE_HA_TOKEN in .env.local —
@@ -44,6 +46,18 @@ const IDLE_TESLA_CONTROL = Object.fromEntries(TESLA_CONTROL_KEYS.map((k) => [k, 
 
 const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 min untouched → idle screen
 
+// NavRail "Devices" alert threshold. Deliberately higher than the row-level
+// amber threshold (800, EnvironmentBar's co2Color) used on Home's room rows
+// — this one's meant to mean "genuinely ventilate", not light up the rail on
+// every mildly-stuffy room.
+const CO2_ALERT_THRESHOLD = 1500;
+
+// Placeholder scene ids — Josh will create these real routines in HA later.
+// scene.turn_on on a missing entity just logs a warning in HA, no crash, so
+// this is safe to ship ahead of the actual scenes existing.
+const SCENE_GOOD_NIGHT = "scene.good_night";
+const SCENE_AWAY = "scene.away";
+
 export default function App() {
   const [rooms, setRooms]           = useState<Room[]>([]);
   const [solar, setSolar]           = useState<SolarState | null>(null);
@@ -58,16 +72,15 @@ export default function App() {
   const [automations, setAutomations] = useState<AutomationState[]>([]);
   const [scenes, setScenes]           = useState<SceneState[]>([]);
 
-  // Single source of truth for top-level nav — house/room world vs. the
-  // automations & scenes panel vs. the energy detail panel. selectedRoomId
-  // only means anything while mainView === "house"; entering "automations"
-  // or "energy" clears it so "back" always lands on the house grid, never a
-  // stale room.
-  const [mainView, setMainView] = useState<MainView>("house");
-  const openAutomations  = useCallback(() => { setRoomId(null); setMainView("automations"); }, []);
-  const closeAutomations = useCallback(() => setMainView("house"), []);
-  const openEnergy  = useCallback(() => { setRoomId(null); setMainView("energy"); }, []);
-  const closeEnergy = useCallback(() => setMainView("house"), []);
+  // Single source of truth for top-level nav — the persistent NavRail's four
+  // tabs (redesign Phase 1: home/devices/energy/automations, renamed from
+  // the old full-screen house/automations/energy swap). selectedRoomId only
+  // means anything while mainView === "home"; leaving home clears it so
+  // "back" always lands on the Home landing, never a stale room.
+  const [mainView, setMainView] = useState<MainView>("home");
+  const openEnergy = useCallback(() => { setRoomId(null); setMainView("energy"); }, []);
+  const closeAutomations = useCallback(() => setMainView("home"), []);
+  const closeEnergy = useCallback(() => setMainView("home"), []);
 
   // Ambient idle screen — fades in after IDLE_TIMEOUT_MS of no pointer/key
   // activity anywhere on the panel, tap-anywhere to wake back to whatever
@@ -484,6 +497,33 @@ export default function App() {
     rooms.forEach((room) => room.lights.forEach((l) => { if (l.cardState === "on") handleLightBrightness(l.id, brightnessPct); }));
   }, [rooms, handleLightBrightness]);
 
+  // ─── Home's Quick Actions row ────────────────────────────────────────────
+  // good_night/away are fire-and-forget scene.turn_on calls against
+  // SCENE_GOOD_NIGHT/SCENE_AWAY — placeholder ids pending the real routines
+  // Josh will build in HA; calling scene.turn_on on a not-yet-existing scene
+  // just logs a warning in HA, no crash.
+  const handleQuickAction = useCallback((id: QuickActionId) => {
+    switch (id) {
+      case "all_off":
+        handleHouseToggle(false);
+        break;
+      case "heat_living":
+        handleClimateMode(HA_ENTITIES.climateSplitSystem, "heat");
+        handleClimateTemp(HA_ENTITIES.climateSplitSystem, 18);
+        handleClimateFan(HA_ENTITIES.climateSplitSystem, "low");
+        break;
+      case "precondition":
+        clientRef.current?.callService("climate", "turn_on", {}, { entity_id: HA_ENTITIES.teslaClimate });
+        break;
+      case "good_night":
+        clientRef.current?.callService("scene", "turn_on", {}, { entity_id: SCENE_GOOD_NIGHT });
+        break;
+      case "away":
+        clientRef.current?.callService("scene", "turn_on", {}, { entity_id: SCENE_AWAY });
+        break;
+    }
+  }, [handleHouseToggle, handleClimateMode, handleClimateTemp, handleClimateFan]);
+
   // ─── Tesla control: pending → confirmed cycle ────────────────────────────
   // Generalized across every toggle/select/cover control on the card — same
   // mechanics as controlLight/controlTesla's original climate+lock pair, just
@@ -617,6 +657,17 @@ export default function App() {
     );
   }
 
+  // NavRail alert dots — devices: any room's CO₂ is genuinely elevated
+  // (see CO2_ALERT_THRESHOLD); energy: the car is unlocked. home/automations
+  // stay alertless for now.
+  const anyRoomCo2Alert = rooms.some((r) =>
+    r.sensors.some((s) => s.data.kind === "co2" && s.data.co2 >= CO2_ALERT_THRESHOLD)
+  );
+  const railAlerts: Partial<Record<MainView, boolean>> = {
+    devices: anyRoomCo2Alert,
+    energy: !tesla.locked,
+  };
+
   let content;
   if (mainView === "automations") {
     content = (
@@ -637,6 +688,8 @@ export default function App() {
           honk: handleTeslaHonk, flash: handleTeslaFlash,
         }} />
     );
+  } else if (mainView === "devices") {
+    content = <DevicesStub />;
   } else {
     content = (
       <AnimatePresence mode="wait">
@@ -648,13 +701,11 @@ export default function App() {
               onClimatePower={handleClimatePower} onClimateMode={handleClimateMode} onClimateTemp={handleClimateTemp} onClimateFan={handleClimateFan} />
           </motion.div>
         ) : (
-          <motion.div key="house" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
-            <HouseView rooms={rooms} outdoor={outdoor}
-              onNavigate={setRoomId}
-              onOpenAutomations={openAutomations}
+          <motion.div key="home" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.22, ease: "easeInOut" }}>
+            <HomeView rooms={rooms} outdoor={outdoor} solar={solar} powerwall={powerwall} tesla={tesla}
+              onNavigateRoom={setRoomId}
               onOpenEnergy={openEnergy}
-              onRoomToggle={handleRoomToggle} onRoomBrightness={handleRoomBrightness}
-              onHouseToggle={handleHouseToggle} onHouseBrightness={handleHouseBrightness} />
+              onQuickAction={handleQuickAction} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -663,7 +714,10 @@ export default function App() {
 
   return (
     <>
-      {content}
+      <div style={{ display: "flex", minHeight: "100vh", background: "var(--tactus-bg-base)" }}>
+        <NavRail active={mainView} onNavigate={(v) => { setRoomId(null); setMainView(v); }} alerts={railAlerts} />
+        <main style={{ flex: 1, minWidth: 0 }}>{content}</main>
+      </div>
       {idle && (
         <IdleScreen rooms={rooms} solar={solar} powerwall={powerwall} tesla={tesla} outdoor={outdoor}
           onWake={() => setIdle(false)} />

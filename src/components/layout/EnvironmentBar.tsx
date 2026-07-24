@@ -22,8 +22,10 @@ const humidColor = (h: number) => h < 30 ? "var(--tactus-amber)" : h > 65 ? "var
 const co2Color   = (c: number) => c < 800 ? "var(--tactus-green)" : c < 1200 ? "var(--tactus-amber)" : "var(--tactus-pink)";
 const pm25Color  = (v: number) => v <= 12 ? "var(--tactus-green)" : v <= 35 ? "var(--tactus-amber)" : "var(--tactus-pink)";
 
-// HA weather state → friendly label + icon.
-const CONDITION: Record<string, { label: string; Icon: LucideIcon }> = {
+// HA weather state → friendly label + icon. Exported so other views (e.g.
+// HomeView's outdoor glance) can reuse the same mapping instead of
+// duplicating it.
+export const CONDITION: Record<string, { label: string; Icon: LucideIcon }> = {
   "clear-night":     { label: "Clear",         Icon: Moon },
   "cloudy":          { label: "Cloudy",        Icon: Cloud },
   "fog":             { label: "Fog",           Icon: CloudFog },

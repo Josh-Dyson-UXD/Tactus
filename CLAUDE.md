@@ -89,22 +89,26 @@ src/
     cards/
       LightCard.tsx / SwitchCard.tsx / SensorCard.tsx (stubbed, unused)
       SolarCard.tsx / PowerwallCard.tsx / TeslaCard.tsx / EnergyFlowCard.tsx
-      RoomCard.tsx / AutomationCard.tsx / SceneCard.tsx
+      RoomCard.tsx / AutomationCard.tsx / SceneCard.tsx / ClimateCard.tsx
     controls/
       BrightnessSlider.tsx / ColorTempSlider.tsx / RoomControls.tsx
     layout/
-      HouseView.tsx          # rooms grid + nav to Energy/Automations
-      RoomView.tsx
-      EnergyView.tsx          # Solar/Powerwall/Tesla/EnergyFlow, behind nav
-      AutomationsView.tsx     # automations + scenes, behind nav
-      EnvironmentBar.tsx / SectionHeading.tsx
+      NavRail.tsx              # persistent left nav rail (redesign Phase 1) — the app shell
+      HomeView.tsx              # new minimal Home landing (redesign Phase 1)
+      DevicesStub.tsx            # Phase 1 placeholder; real board is Phase 3
+      RoomView.tsx               # unrestyled — Phase 2
+      EnergyView.tsx             # unrestyled — Phase 4; Solar/Powerwall/Tesla/EnergyFlow
+      AutomationsView.tsx        # unrestyled — Phase 4; automations + scenes
+      HouseView.tsx / EnvironmentBar.tsx  # superseded by NavRail+HomeView (Phase 1);
+                                           # left in place, unused, not yet deleted
+      SectionHeading.tsx
     icons/
   lib/
     ha-client.ts             # WebSocket + REST client, mergeStates(), auth-error signal
     ha-types.ts               # HA entity ↔ Tactus-type mapping, HA_ENTITIES map
     helpers.ts
   types/
-    index.ts                 # includes MainView: "house" | "automations" | "energy"
+    index.ts                 # includes MainView: "home" | "devices" | "energy" | "automations"
   styles/
     theme.css                 # Tactus tokens, plus kiosk shell rules (safe-area,
                               # touch-behavior suppression) appended for iPad
@@ -303,6 +307,56 @@ weight in one test environment, which is what surfaced the need for this).
 - Sunset-based dimming instead of the fixed 22:00–06:00 clock window.
 - A forecast glance — would need HA's `weather.get_forecasts` service call,
   not just the current-conditions state `OutdoorState` already reads.
+
+## UI redesign — persistent shell (Phase 1 of 4, 2026-07-24)
+
+Tactus is mid-migration from a full-screen-view-swap model to a persistent
+left `NavRail` + content-area shell, plus a new minimal Home landing. This is
+a multi-phase redesign; only Phase 1 (the shell + Home) is done. **Energy,
+Automations, and RoomView are intentionally unrestyled** — they still render
+on their pre-redesign components (`EnergyView.tsx`, `AutomationsView.tsx`,
+`RoomView.tsx`) inside the new shell's content area, and will get their own
+passes in later phases. Don't restyle them opportunistically; that's a
+scoped, separate task per phase.
+
+- **`NavRail.tsx`** — fixed ~66px-wide, full-height left rail, always
+  visible regardless of `mainView`. Four tabs: Home/Devices/Energy/
+  Automations (`Home`/`LayoutGrid`/`Zap`/`Wand2` from `lucide-react`).
+  Active tab: amber icon+label + a soft amber background tint. An 8px amber
+  alert dot can badge a tab's icon (`alerts: Partial<Record<MainView,
+  boolean>>` prop) — currently wired for `devices` (see CO₂ threshold below)
+  and `energy` (car unlocked); `home`/`automations` are alertless for now,
+  not because they can't have alerts, just nothing's wired yet. Own live
+  `HH:MM` clock at the bottom, same `setInterval` pattern as `IdleScreen`.
+- **`HomeView.tsx`** — the new Home landing, replacing the old `HouseView`
+  grid. Four stacked sections in the calm/minimal idle-screen visual
+  language (near-black ground, one contained card per section with hairline
+  dividers between items rather than a card per item, light Geist Mono
+  numerals): a header (My Home + outdoor glance, reusing `EnvironmentBar`'s
+  exported `CONDITION` icon/label map — don't duplicate that mapping);
+  one Energy-overview card (Solar/Powerwall/Ghost columns, tappable through
+  to the Energy tab); a Quick Actions card (5 one-tap actions, see below);
+  a Rooms card (one row per room, active rooms sorted first, a quiet status
+  string per row that omits "Off" entirely — a grey dot already says that).
+- **`DevicesStub.tsx`** — Phase 1 placeholder for the Devices tab. The real
+  board (grouped by room/type, richer controls) is Phase 3.
+- **`MainView`** renamed/extended: `"house"` → `"home"`, plus a new
+  `"devices"` entry. `selectedRoomId` (room detail) only means anything
+  while `mainView === "home"` — leaving Home clears it, same as before.
+- **Quick Actions** (`QuickActionId`, `HomeView`'s Quick Actions card,
+  dispatched via `App.tsx`'s `handleQuickAction`): `all_off` (existing
+  `handleHouseToggle(false)`); `heat_living` (drives the Sensibo split
+  system — `set_hvac_mode` heat / `set_temperature` 18 / `set_fan_mode`
+  low, reusing the existing climate control handlers); `precondition`
+  (`climate.turn_on` on `HA_ENTITIES.teslaClimate`); `good_night` / `away`
+  (`scene.turn_on` on `scene.good_night` / `scene.away` — **placeholder
+  scene ids**, pending real routines Josh will build in HA; calling
+  `scene.turn_on` on a not-yet-existing scene just logs an HA warning, no
+  crash, so this is safe to ship ahead of the scenes existing).
+- **`CO2_ALERT_THRESHOLD`** (1500ppm, `App.tsx`) gates the Devices tab's
+  alert dot — deliberately higher than the 800ppm amber threshold used on
+  Home's room-row CO₂ callouts (`EnvironmentBar`'s `co2Color`), so the rail
+  isn't lit for every mildly-stuffy room, only a genuine "ventilate" case.
 
 ## Design rules — do not violate these
 
