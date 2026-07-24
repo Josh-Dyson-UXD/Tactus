@@ -124,7 +124,7 @@ export function IdleScreen({ rooms, solar, powerwall, tesla, outdoor, onWake }: 
             {batteryWord(powerwall.status)}
           </Column>
 
-          <Column label="Elsa" value={`${Math.round(tesla.batteryPct)}`} unit="%">
+          <Column label="Ghost" value={`${Math.round(tesla.batteryPct)}`} unit="%">
             {Math.round(tesla.rangeKm)} km · {carWord(tesla.status)}
           </Column>
         </div>

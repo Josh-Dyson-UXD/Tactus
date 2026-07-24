@@ -157,13 +157,20 @@ export type SceneState = {
   name: string;                     // friendly_name, trimmed
 };
 
-// Top-level app view. Deliberately separate from LightState's `Panel` (that's
-// a light card's own internal summary/brightness/color sub-navigation, a
-// different concept). "automations" also holds the Scenes section — kept as
-// one view rather than splitting nav further, per the brief. "energy" holds
-// Solar/Powerwall/Tesla/EnergyFlow — split out of the house view because it
-// and the Rooms grid together overflowed 1180x820 on the wall-panel target.
-export type MainView = "house" | "automations" | "energy";
+// Top-level app view — now the persistent NavRail's four tabs (redesign
+// Phase 1). "house" renamed to "home" (new minimal HomeView landing);
+// "devices" added (stub in Phase 1, real board in Phase 3). "automations"
+// also holds the Scenes section — kept as one view rather than splitting nav
+// further, per the brief. "energy" holds Solar/Powerwall/Tesla/EnergyFlow —
+// split out of the old house view because it and the Rooms grid together
+// overflowed 1180x820 on the wall-panel target; still true under the new
+// shell, so Energy stays its own tab rather than folding back into Home.
+export type MainView = "home" | "devices" | "energy" | "automations";
+
+// Home's Quick Actions row. Deliberately a fixed, curated set (not dynamic
+// like automations/scenes) — these are one-tap shortcuts for common
+// intents, distinct from the full Automations & Scenes panel.
+export type QuickActionId = "all_off" | "good_night" | "away" | "precondition" | "heat_living";
 
 // ─── Room ─────────────────────────────────────────────────────────────────────
 
