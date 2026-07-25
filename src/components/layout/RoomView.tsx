@@ -172,10 +172,16 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
                     <div key={s.id} className="flex items-center gap-3 w-full" style={{ padding: "14px 20px", borderBottom: isLast ? "none" : "1px solid var(--tactus-border-subtle)" }}>
                       <Plug size={14} color={s.isOn ? "var(--tactus-green)" : "var(--tactus-text-muted)"} />
                       <p className="flex-1" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: s.isOn ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{s.device}</p>
+                      {/* Same sliding toggle as DevicesView's plug rows — a
+                          plug should look identical in both places. */}
                       <button onClick={() => onSwitchToggle(s.id, !s.isOn)} disabled={s.status === "error"}
-                        className="flex items-center px-[10px] py-[4px] rounded-full cursor-pointer disabled:cursor-default"
-                        style={{ background: withAlpha("#22C55E", s.isOn ? 0.13 : 0.06) }}>
-                        <p className="text-[10px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: s.isOn ? "var(--tactus-green)" : "var(--tactus-text-muted)" }}>{s.status === "error" ? "ERR" : s.isOn ? "ON" : "OFF"}</p>
+                        className="relative shrink-0 cursor-pointer disabled:cursor-default transition-colors"
+                        style={{ width: 40, height: 24, borderRadius: 9999, background: s.status === "error" ? withAlpha("#EF4444", 0.25) : s.isOn ? withAlpha("#22C55E", 0.5) : "var(--tactus-border-default)" }}>
+                        <span className="absolute rounded-full" style={{
+                          width: 18, height: 18, top: 3, left: s.isOn ? 19 : 3,
+                          background: "#fff", transition: "left 0.18s ease",
+                          animation: s.status === "pending" ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined,
+                        }} />
                       </button>
                     </div>
                   );
