@@ -93,6 +93,8 @@ src/
       RoomCard.tsx / AutomationCard.tsx / SceneCard.tsx
       ClimateCard.tsx            # standalone + embedded mode (RoomView's two-column layout)
       LightSheet.tsx             # deep light control overlay (redesign Phase 2)
+      ClimateSheet.tsx           # deep climate control overlay (redesign Phase 3)
+      GhostSheet.tsx             # full Tesla control overlay (redesign Phase 4a)
     controls/
       BrightnessSlider.tsx / ColorTempSlider.tsx / RoomControls.tsx (unused
         since Phase 2 — RoomView now builds its own slim brightness bar)
@@ -101,8 +103,8 @@ src/
       HomeView.tsx              # new minimal Home landing (redesign Phase 1)
       DevicesStub.tsx            # Phase 1 placeholder; real board is Phase 3
       RoomView.tsx               # restyled (Phase 2) — see "UI redesign" below
-      EnergyView.tsx             # unrestyled — Phase 4; Solar/Powerwall/Tesla/EnergyFlow
-      AutomationsView.tsx        # unrestyled — Phase 4; automations + scenes
+      EnergyView.tsx             # restyled (Phase 4a) — stat cards + Ghost block, see below
+      AutomationsView.tsx        # unrestyled — Phase 4b; automations + scenes
       HouseView.tsx / EnvironmentBar.tsx  # superseded by NavRail+HomeView (Phase 1);
                                            # left in place, unused, not yet deleted
       SectionHeading.tsx
@@ -312,17 +314,17 @@ weight in one test environment, which is what surfaced the need for this).
 - A forecast glance — would need HA's `weather.get_forecasts` service call,
   not just the current-conditions state `OutdoorState` already reads.
 
-## UI redesign — persistent shell + room detail + devices board (Phases 1–3 of 4)
+## UI redesign — persistent shell + room detail + devices board + energy (Phases 1–4a of 4)
 
 Tactus is mid-migration from a full-screen-view-swap model to a persistent
 left `NavRail` + content-area shell, plus a new minimal Home landing, a
-restyled room detail view, and a real Devices board. Phases 1 (shell + Home,
-2026-07-24), 2 (room detail + light sheet, 2026-07-24), and 3 (devices board,
-2026-07-25) are done. **Energy and Automations are still intentionally
-unrestyled** — they render on their pre-redesign components (`EnergyView.tsx`,
-`AutomationsView.tsx`) inside the new shell's content area, and will get their
-own pass in Phase 4, the last remaining phase. Don't restyle them
-opportunistically; that's a scoped, separate task per phase.
+restyled room detail view, a real Devices board, and a restyled Energy view.
+Phases 1 (shell + Home, 2026-07-24), 2 (room detail + light sheet,
+2026-07-24), 3 (devices board, 2026-07-25), and 4a (Energy restyle,
+2026-07-25) are done. **Automations is still intentionally unrestyled** — it
+renders on its pre-redesign component (`AutomationsView.tsx`) inside the new
+shell's content area, and gets its own pass in Phase 4b, the last remaining
+phase. Don't restyle it opportunistically; that's a scoped, separate task.
 
 - **`NavRail.tsx`** — fixed ~66px-wide, full-height left rail, always
   visible regardless of `mainView`. Four tabs: Home/Devices/Energy/
@@ -456,6 +458,55 @@ opportunistically; that's a scoped, separate task per phase.
   `onNavigateRoom` — rooms only render under the Home tab, so jumping into
   one from the board has to switch tabs, not just set `selectedRoomId`.
   `DevicesStub` is no longer imported by `App.tsx`.
+
+### Phase 4a — Energy restyle (2026-07-25)
+
+- **`EnergyView.tsx`** restyled to the same minimal language, replacing the
+  old `SolarCard`/`PowerwallCard`/`TeslaCard`/`EnergyFlowCard` grid (those
+  four files are now unused, left in place for reference like the rest of
+  the pre-redesign cards). No back button — the persistent `NavRail`
+  handles navigation, same as Home/Devices. Layout, top to bottom:
+  - A row of four independent stat cards (`SolarStat`/`PowerwallStat`/
+    `GridStat`/`HomeStat`) — Solar (Generating/Idle, live kW, Today kWh),
+    Powerwall (charging/discharging/holding/on backup, big %, the charge
+    bar with a reserve-percent marker, ± kW flow when actively charging or
+    discharging), Grid (Importing/Exporting/Idle, kW), Home (kW, "Using
+    now"). Each follows the same header grammar — icon + label left, a
+    coloured state word right — so the row reads as one family. **An
+    earlier version of this pass used a connected flow-strip (nodes +
+    directional arrows) instead of independent cards — deliberately
+    replaced** after review: the brief wanted plain state readouts with no
+    flow connectors at all, and Solar/Powerwall no longer get a *second*,
+    separate card once the stat row already covers them. If a flow
+    visualisation is wanted later, that's new work, not a revival of the
+    removed `FlowStrip`.
+  - **Ghost block** — one contained card: header (car icon + "Ghost" +
+    "Model 3 · {tesla.location}", a live `+{chargingKw} kW` readout when
+    charging), the battery % and range km, then a row of core control
+    chips (Climate, Lock — green when locked, Sentry) wired directly to
+    `teslaActions`/`teslaControl`, plus a "More" chip that opens
+    `GhostSheet`.
+- **`GhostSheet.tsx`** (new) — the full Tesla control set, opened from the
+  Ghost block's "More" chip. Centred overlay (dim backdrop, click-to-close,
+  inline close ✕ in the header), mirroring `LightSheet`/`ClimateSheet`'s
+  pattern; scrollable body (`maxHeight: 86vh`) since the full control set is
+  long: quick actions (Honk/Flash), Climate (on/off + preset + max
+  defrost/"Bioweapon Defense"), Security (Sentry/Valet), Comfort (seat
+  heater FL/FR + steering-wheel heater level pickers), Access (Frunk —
+  open-only — Trunk, Windows). This is a re-skin of `TeslaCard`'s expanded
+  section into the new minimal language, not new behaviour — same
+  `teslaActions` handlers, same `teslaControl` pending → confirmed cycle
+  (ambient pulse on pending, red on error, never a spinner). `Chip`/
+  `QuickAction`/`LevelPicker` are reimplemented locally in `GhostSheet.tsx`
+  rather than imported from `TeslaCard`, which is now unused (left in place
+  for reference, same treatment as the other superseded cards above).
+- Colour convention for Phase 4a: solar amber, battery/powerwall green,
+  grid blue, car/Ghost blue, heater-related controls (seat heaters,
+  steering-wheel heater, max defrost) amber — matches the "heat" accent
+  used elsewhere (e.g. the Sensibo heat mode in `ClimateCard`).
+- `App.tsx`: `EnergyView` no longer takes an `onBack` prop (the rail
+  handles navigation), so the now-dead `closeEnergy` handler was removed.
+  `openEnergy` (Home's energy-overview card → Energy tab) is unchanged.
 
 ## Design rules — do not violate these
 

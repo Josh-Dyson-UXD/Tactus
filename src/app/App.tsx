@@ -80,7 +80,6 @@ export default function App() {
   const [mainView, setMainView] = useState<MainView>("home");
   const openEnergy = useCallback(() => { setRoomId(null); setMainView("energy"); }, []);
   const closeAutomations = useCallback(() => setMainView("home"), []);
-  const closeEnergy = useCallback(() => setMainView("home"), []);
   // Devices board → room detail: rooms live under Home, so jumping into one
   // from a Devices row header sets the room and switches tabs.
   const openRoom = useCallback((id: string) => { setRoomId(id); setMainView("home"); }, []);
@@ -679,7 +678,7 @@ export default function App() {
     );
   } else if (mainView === "energy") {
     content = (
-      <EnergyView solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} homeLoad={homeLoad} onBack={closeEnergy}
+      <EnergyView solar={solar} powerwall={powerwall} grid={grid} tesla={tesla} homeLoad={homeLoad}
         teslaControl={teslaControl}
         teslaActions={{
           toggleClimate: handleToggleTeslaClimate, toggleLock: handleToggleTeslaLock,
