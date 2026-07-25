@@ -312,15 +312,16 @@ weight in one test environment, which is what surfaced the need for this).
 - A forecast glance — would need HA's `weather.get_forecasts` service call,
   not just the current-conditions state `OutdoorState` already reads.
 
-## UI redesign — persistent shell + room detail (Phases 1–2 of 4)
+## UI redesign — persistent shell + room detail + devices board (Phases 1–3 of 4)
 
 Tactus is mid-migration from a full-screen-view-swap model to a persistent
-left `NavRail` + content-area shell, plus a new minimal Home landing and a
-restyled room detail view. Phases 1 (shell + Home, 2026-07-24) and 2 (room
-detail + light sheet, 2026-07-24) are done. **Energy and Automations are
-still intentionally unrestyled** — they render on their pre-redesign
-components (`EnergyView.tsx`, `AutomationsView.tsx`) inside the new shell's
-content area, and will get their own pass in Phase 4. Don't restyle them
+left `NavRail` + content-area shell, plus a new minimal Home landing, a
+restyled room detail view, and a real Devices board. Phases 1 (shell + Home,
+2026-07-24), 2 (room detail + light sheet, 2026-07-24), and 3 (devices board,
+2026-07-25) are done. **Energy and Automations are still intentionally
+unrestyled** — they render on their pre-redesign components (`EnergyView.tsx`,
+`AutomationsView.tsx`) inside the new shell's content area, and will get their
+own pass in Phase 4, the last remaining phase. Don't restyle them
 opportunistically; that's a scoped, separate task per phase.
 
 - **`NavRail.tsx`** — fixed ~66px-wide, full-height left rail, always
@@ -342,8 +343,10 @@ opportunistically; that's a scoped, separate task per phase.
   to the Energy tab); a Quick Actions card (5 one-tap actions, see below);
   a Rooms card (one row per room, active rooms sorted first, a quiet status
   string per row that omits "Off" entirely — a grey dot already says that).
-- **`DevicesStub.tsx`** — Phase 1 placeholder for the Devices tab. The real
-  board (grouped by room/type, richer controls) is Phase 3.
+- **`DevicesStub.tsx`** — Phase 1 placeholder for the Devices tab, superseded
+  by `DevicesView.tsx` in Phase 3 (see below). Left in place, unused, not yet
+  deleted — same treatment as `HouseView.tsx`/`EnvironmentBar.tsx` after
+  Phase 1.
 - **`MainView`** renamed/extended: `"house"` → `"home"`, plus a new
   `"devices"` entry. `selectedRoomId` (room detail) only means anything
   while `mainView === "home"` — leaving Home clears it, same as before.
@@ -398,6 +401,61 @@ opportunistically; that's a scoped, separate task per phase.
 - `LightCard.tsx`, `SensorCard.tsx`, `RoomControls.tsx` are now unused
   (RoomView no longer renders them) — left in place for reference, may be
   removed in a later cleanup pass.
+
+### Phase 3 — devices board (2026-07-25)
+
+- **`DevicesView.tsx`** (new) — the real board behind the Devices tab,
+  replacing `DevicesStub`. One contained block per room (same
+  `--tactus-bg-recessed` + hairline-divider grammar as everywhere else in
+  the redesign), sorted active-first (`isRoomActive`: any light on, any
+  switch on, or climate in any mode but its own "off"). Each room block's
+  header row is itself a button: a dot (amber+glow if the room is active,
+  else grey) and the room name on the left, tapping it calls
+  `onNavigateRoom(room.id)` to jump straight into that room's `RoomView`; on
+  the right, a compact muted air summary (`{temp}° · {humidity}% ·
+  CO₂ {co2}`, `· PM2.5 {pm25}` when the room has it) built the same way as
+  RoomView's Air card, with the CO₂ figure only picking up `co2Label`'s
+  colour once it's actually elevated (≥800ppm) — otherwise it stays muted
+  like the rest of the summary, not permanently green. Rooms without any air
+  sensors just show the name, no summary.
+  Below the header, one row per device in a fixed order (climate, then
+  lights, then switches) — hairline separators, no group headers of their
+  own: a climate row (mode-tinted icon + name, mode status text e.g. "Cool
+  22°" in the mode colour, a sliding power toggle, a chevron — tapping the
+  row opens `ClimateSheet`); light rows (swatch dot + name + brightness % +
+  sliding toggle + chevron — tapping the row opens the same `LightSheet`
+  Phase 2 built, reused as-is, not forked); plug/switch rows (icon + name +
+  sliding toggle, no chevron — no deep controls exist for a plain switch).
+  Light and switch row markup is replicated from `RoomView`'s row grammar
+  (not extracted into a shared component — both call sites stayed simple
+  enough that a shared `LightRow`/`PlugRow` would have been premature) —
+  but the actual interactive components (`LightSheet`, `ClimateCard`) are
+  reused, never forked. Owns local `openLightId`/`openClimateId` state and
+  renders `LightSheet`/`ClimateSheet` as overlays, same pattern as
+  `RoomView`'s `openLightId`.
+- **`ClimateSheet.tsx`** (new) — the climate equivalent of `LightSheet`: a
+  centred dim-backdrop overlay, click-backdrop-to-close, wrapping the
+  existing standalone `ClimateCard` (`embedded={false}`) rather than
+  forking its controls. The close ✕ is **not** a floating button outside
+  the sheet (that was tried first and rejected — it visually collided with
+  the card's own header) — instead `ClimateCard` gained an optional
+  `onClose?: () => void` prop that, when passed, renders the ✕ inline in
+  the standalone header's button group next to the power-toggle pill, same
+  `flex gap-2` grammar `LightSheet`'s own header already uses for its
+  toggle+close pair. `onClose` is omitted everywhere else `ClimateCard` is
+  used standalone, so this stays strictly opt-in.
+- **`RoomView.tsx`** — switch/plug rows now use the same sliding toggle as
+  `DevicesView`'s plug rows (was an ON/OFF text pill; now the pill/thumb
+  toggle shared with light rows), wired to the same `onSwitchToggle`. A plug
+  should look and behave identically whether it's seen from a room's own
+  view or the Devices board — this was the one place a duplicated row
+  pattern had visibly drifted between the two surfaces, so it's now the
+  same markup in both.
+- `App.tsx` gained `openRoom` (`setRoomId(id); setMainView("home")`) as the
+  Devices→Home navigation handler, passed to `DevicesView` as
+  `onNavigateRoom` — rooms only render under the Home tab, so jumping into
+  one from the board has to switch tabs, not just set `selectedRoomId`.
+  `DevicesStub` is no longer imported by `App.tsx`.
 
 ## Design rules — do not violate these
 

@@ -21,7 +21,7 @@ import { EnergyView } from "@/components/layout/EnergyView";
 import { IdleScreen } from "@/components/layout/IdleScreen";
 import { NavRail } from "@/components/layout/NavRail";
 import { HomeView } from "@/components/layout/HomeView";
-import { DevicesStub } from "@/components/layout/DevicesStub";
+import { DevicesView } from "@/components/layout/DevicesView";
 
 // Two supported modes (see README "Deployment"):
 //  - Direct-to-HA dev: set both VITE_HA_URL and VITE_HA_TOKEN in .env.local —
@@ -81,6 +81,9 @@ export default function App() {
   const openEnergy = useCallback(() => { setRoomId(null); setMainView("energy"); }, []);
   const closeAutomations = useCallback(() => setMainView("home"), []);
   const closeEnergy = useCallback(() => setMainView("home"), []);
+  // Devices board → room detail: rooms live under Home, so jumping into one
+  // from a Devices row header sets the room and switches tabs.
+  const openRoom = useCallback((id: string) => { setRoomId(id); setMainView("home"); }, []);
 
   // Ambient idle screen — fades in after IDLE_TIMEOUT_MS of no pointer/key
   // activity anywhere on the panel, tap-anywhere to wake back to whatever
@@ -689,7 +692,12 @@ export default function App() {
         }} />
     );
   } else if (mainView === "devices") {
-    content = <DevicesStub />;
+    content = (
+      <DevicesView rooms={rooms} onNavigateRoom={openRoom}
+        onLightToggle={handleLightToggle} onLightBrightness={handleLightBrightness} onLightColor={handleLightColor} onLightColorTemp={handleLightColorTemp}
+        onSwitchToggle={handleSwitchToggle}
+        onClimatePower={handleClimatePower} onClimateMode={handleClimateMode} onClimateTemp={handleClimateTemp} onClimateFan={handleClimateFan} />
+    );
   } else {
     content = (
       <AnimatePresence mode="wait">

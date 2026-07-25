@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Flame, Snowflake, Droplet, Wind, Power, ArrowLeftRight } from "lucide-react";
+import { Flame, Snowflake, Droplet, Wind, Power, ArrowLeftRight, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ClimateState, HvacMode } from "@/types";
 import { withAlpha } from "@/lib/helpers";
@@ -58,7 +58,7 @@ const FAN_LABEL: Record<string, string> = {
   quiet: "Quiet", low: "Low", medium: "Medium", high: "High", auto: "Auto",
 };
 
-export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetFan, embedded = false }: {
+export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetFan, embedded = false, onClose }: {
   state: ClimateState;
   onTogglePower: (on: boolean) => void;
   onSetMode: (mode: HvacMode) => void;
@@ -71,6 +71,11 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
   // humidity, and the section label already covers the device name/status
   // that the standalone header used to show).
   embedded?: boolean;
+  // Standalone mode only (ClimateSheet) — renders a close ✕ inline in the
+  // header's button group, next to the power toggle, same grammar as
+  // LightSheet's toggle+close group. Omitted for every other standalone
+  // usage, so this stays opt-in rather than assumed.
+  onClose?: () => void;
 }) {
   const { device, mode, hvacModes, currentTemp, targetTemp, currentHumidity, minTemp, maxTemp, step, fanMode, fanModes, status } = state;
   const isOff = mode === "off";
@@ -205,13 +210,20 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
             <p className="text-[12px] leading-none mt-[2px]" style={{ fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-muted)" }}>Living Room</p>
           </div>
         </div>
-        <button className="flex items-center px-[10px] py-[4px] rounded-full relative cursor-pointer disabled:cursor-default" style={{ background: withAlpha(accentHex, isOff ? 0.06 : 0.13), animation: pulse }}
-          disabled={isPending} onClick={() => onTogglePower(isOff)}>
-          <div aria-hidden className="absolute inset-0 rounded-full pointer-events-none" style={{ border: `1px solid ${withAlpha(accentHex, 0.25)}` }} />
-          <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>
-            {isError ? "ERROR" : isPending ? "SYNCING" : ACTION_LABEL[mode]}
-          </p>
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center px-[10px] py-[4px] rounded-full relative cursor-pointer disabled:cursor-default" style={{ background: withAlpha(accentHex, isOff ? 0.06 : 0.13), animation: pulse }}
+            disabled={isPending} onClick={() => onTogglePower(isOff)}>
+            <div aria-hidden className="absolute inset-0 rounded-full pointer-events-none" style={{ border: `1px solid ${withAlpha(accentHex, 0.25)}` }} />
+            <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>
+              {isError ? "ERROR" : isPending ? "SYNCING" : ACTION_LABEL[mode]}
+            </p>
+          </button>
+          {onClose && (
+            <button onClick={onClose} className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity" style={{ width: 32, height: 32, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
+              <X size={14} color="var(--tactus-text-secondary)" />
+            </button>
+          )}
+        </div>
       </div>
 
       {controls}
