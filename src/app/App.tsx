@@ -79,7 +79,6 @@ export default function App() {
   // "back" always lands on the Home landing, never a stale room.
   const [mainView, setMainView] = useState<MainView>("home");
   const openEnergy = useCallback(() => { setRoomId(null); setMainView("energy"); }, []);
-  const closeAutomations = useCallback(() => setMainView("home"), []);
   // Devices board → room detail: rooms live under Home, so jumping into one
   // from a Devices row header sets the room and switches tabs.
   const openRoom = useCallback((id: string) => { setRoomId(id); setMainView("home"); }, []);
@@ -673,7 +672,7 @@ export default function App() {
   let content;
   if (mainView === "automations") {
     content = (
-      <AutomationsView automations={automations} scenes={scenes} onBack={closeAutomations}
+      <AutomationsView automations={automations} scenes={scenes}
         onToggleAutomation={toggleAutomation} onRunAutomation={triggerAutomation} onActivateScene={activateScene} />
     );
   } else if (mainView === "energy") {

@@ -89,8 +89,10 @@ src/
     cards/
       LightCard.tsx / SwitchCard.tsx / SensorCard.tsx (unused since Phase 2's
         RoomView restyle — left for reference, may remove in a cleanup pass)
-      SolarCard.tsx / PowerwallCard.tsx / TeslaCard.tsx / EnergyFlowCard.tsx
-      RoomCard.tsx / AutomationCard.tsx / SceneCard.tsx
+      SolarCard.tsx / PowerwallCard.tsx / TeslaCard.tsx / EnergyFlowCard.tsx (unused
+        since Phase 4a's EnergyView restyle — left for reference, same as the row above)
+      RoomCard.tsx (unused since Phase 2's RoomView restyle)
+      AutomationCard.tsx / SceneCard.tsx (unused since Phase 4b's AutomationsView restyle)
       ClimateCard.tsx            # standalone + embedded mode (RoomView's two-column layout)
       LightSheet.tsx             # deep light control overlay (redesign Phase 2)
       ClimateSheet.tsx           # deep climate control overlay (redesign Phase 3)
@@ -104,7 +106,7 @@ src/
       DevicesStub.tsx            # Phase 1 placeholder; real board is Phase 3
       RoomView.tsx               # restyled (Phase 2) — see "UI redesign" below
       EnergyView.tsx             # restyled (Phase 4a) — stat cards + Ghost block, see below
-      AutomationsView.tsx        # unrestyled — Phase 4b; automations + scenes
+      AutomationsView.tsx        # restyled (Phase 4b) — scene tiles + automation list, see below
       HouseView.tsx / EnvironmentBar.tsx  # superseded by NavRail+HomeView (Phase 1);
                                            # left in place, unused, not yet deleted
       SectionHeading.tsx
@@ -314,17 +316,21 @@ weight in one test environment, which is what surfaced the need for this).
 - A forecast glance — would need HA's `weather.get_forecasts` service call,
   not just the current-conditions state `OutdoorState` already reads.
 
-## UI redesign — persistent shell + room detail + devices board + energy (Phases 1–4a of 4)
+## UI redesign — complete (Phases 1–4b)
 
-Tactus is mid-migration from a full-screen-view-swap model to a persistent
-left `NavRail` + content-area shell, plus a new minimal Home landing, a
-restyled room detail view, a real Devices board, and a restyled Energy view.
-Phases 1 (shell + Home, 2026-07-24), 2 (room detail + light sheet,
-2026-07-24), 3 (devices board, 2026-07-25), and 4a (Energy restyle,
-2026-07-25) are done. **Automations is still intentionally unrestyled** — it
-renders on its pre-redesign component (`AutomationsView.tsx`) inside the new
-shell's content area, and gets its own pass in Phase 4b, the last remaining
-phase. Don't restyle it opportunistically; that's a scoped, separate task.
+Tactus migrated from a full-screen-view-swap model to a persistent left
+`NavRail` + content-area shell, with a new minimal Home landing, a restyled
+room detail view, a real Devices board, and restyled Energy and Automations
+views. Phases 1 (shell + Home, 2026-07-24), 2 (room detail + light sheet,
+2026-07-24), 3 (devices board, 2026-07-25), 4a (Energy restyle, 2026-07-25),
+and 4b (Automations restyle, 2026-07-25) are all done — **the redesign is
+complete.** All four `NavRail` tabs (Home, Devices, Energy, Automations),
+room detail, every deep-control sheet (`LightSheet`/`ClimateSheet`/
+`GhostSheet`), and the idle screen now share the one unified minimal
+language (near-black grounds, contained blocks with hairline dividers,
+light Geist Mono numerals, colour used only for state). Any further UI work
+from here is new scope, not a remaining redesign phase — treat it with the
+same checkpoint discipline, not as "finishing the redesign."
 
 - **`NavRail.tsx`** — fixed ~66px-wide, full-height left rail, always
   visible regardless of `mainView`. Four tabs: Home/Devices/Energy/
@@ -507,6 +513,46 @@ phase. Don't restyle it opportunistically; that's a scoped, separate task.
 - `App.tsx`: `EnergyView` no longer takes an `onBack` prop (the rail
   handles navigation), so the now-dead `closeEnergy` handler was removed.
   `openEnergy` (Home's energy-overview card → Energy tab) is unchanged.
+
+### Phase 4b — Automations restyle (2026-07-25, redesign complete)
+
+- **`AutomationsView.tsx`** restyled to the same minimal language, replacing
+  the old `AutomationCard`/`SceneCard` grid (both now unused, left in place
+  for reference like the other superseded cards). No back button — the
+  persistent `NavRail` handles navigation, same as every other tab.
+  - **Scenes** — one-tap tiles (`SceneTile`, local to this file): a default
+    `Sparkles` glyph (scenes carry no icon of their own) + the scene name,
+    in a wrapping row. Tapping calls `onActivateScene` and gives a brief
+    local amber glow pulse (same fire-and-forget feedback pattern the old
+    `SceneCard` used — no persistent state to reflect, nothing lifted to
+    app state). The whole section is omitted, not just emptied, when
+    `scenes.length === 0`.
+  - **Automations** — one contained list card (`AutomationRow`, hairline
+    separators), not a card-per-automation grid like the old
+    `AutomationCard`. Left: a status dot — green with glow for `state ===
+    "on"`, grey for `"off"`, red for `"unavailable"` — then the name
+    (secondary-muted when not on) with a subtitle beneath: `relativeTime
+    (lastTriggered)` when on, literal "Disabled" when off, literal
+    "Unavailable" (in red) when unavailable. Right: a circular run-now
+    button (`onRunAutomation`, fire-and-forget, same local-pulse feedback
+    pattern as the scene tiles — briefly swaps to a `Check` glyph) and a
+    sliding enable toggle — **the exact same toggle grammar as
+    `DevicesView`'s plug rows / `RoomView`'s switch rows** (same
+    dimensions, same thumb, same `tactus-pulse` animation while
+    `AutomationState.status === "pending"`), wired to `onToggleAutomation`.
+    Both the run button and the toggle are dimmed and disabled when
+    `state === "unavailable"`. Sort order is untouched — still whatever
+    order `App.tsx`/`ha-types.ts` already produce (alphabetical), this view
+    doesn't re-sort.
+  - The periodic re-render tick (`RELATIVE_TIME_TICK_MS`, 60s) that keeps
+    "Xh ago" fresh on the always-on wall display carries over unchanged
+    from the pre-redesign view.
+- `App.tsx`: `AutomationsView` no longer takes an `onBack` prop, so the
+  now-dead `closeAutomations` handler was removed, mirroring Phase 4a's
+  `closeEnergy` removal.
+- `SectionHeading.tsx` is now unused (this was its last caller) — left in
+  place, same treatment as every other superseded component from earlier
+  phases, not deleted.
 
 ## Design rules — do not violate these
 
