@@ -6,6 +6,17 @@ it continues to evolve. The original build (Figma prototype → real app wired
 to Home Assistant → deployed wall panel) is complete; this file now tracks an
 already-shipped system, not a from-scratch build.
 
+**Last reconciled against real HA state: 2026-08-21**, following the
+2026-08-19 Eve→MYGGSPRAY migration and a Thread re-pairing that silently
+drifted two entity IDs (see "Entity mapping"). Everything through the
+2026-07-25 UI redesign (Phases 1–4b) was reconciled against a working repo
+checkout; everything from 2026-08-19 onward was reconciled against a fresh
+Developer Tools → States dump, not just conversation notes — where the two
+disagreed, the States dump won. One known gap remains unverified: whether
+any entity besides the Living Room/Laundry sensors also drifted during the
+same re-pairing (lights, other MYGGSPRAY sensors). Re-check against a full
+States dump before trusting this file's entity IDs long-term.
+
 ## What this project is
 
 A custom smart-home control dashboard, design system: **Tactus**. Calm and
@@ -25,12 +36,18 @@ flagged decision (see "Design rules" and the Energy-view precedent below).
   `App.tsx` — it's now ~460 lines of orchestration only: HA connection
   lifecycle, pending/confirmed control state, and view routing.
 - **Live Home Assistant data end to end.** No mock state anywhere in the
-  shipped app. Real entities: 19 DIRIGERA lights across 6 rooms
-  (bedroom/kitchen/living_room/laundry/bathroom/front_door), Tesla ("Ghost",
-  a Model 3 Highland) with full quick-actions, Solar/Powerwall/Grid, one
-  curated switch (a Kasa-style plug), automations & scenes (dynamically
-  discovered, not curated), and per-room indoor air sensors (Kitchen,
-  Bedroom, Living Room, Laundry).
+  shipped app. Real entities: DIRIGERA lights across **7 rooms**
+  (bedroom/kitchen/living_room/laundry/bathroom/front_door/**toilet**, added
+  2026-08-19 — see "Eve retirement" below), Tesla ("Ghost", a Model 3
+  Highland) with full quick-actions, Solar/Powerwall/Grid, one curated
+  switch (a Kasa-style plug), automations & scenes (dynamically discovered,
+  not curated), and per-room indoor air sensors (Kitchen, Bedroom, Living
+  Room, Laundry). The light count is no longer confirmed at exactly 19 —
+  Thread re-pairing on 2026-08-19 changed several entity IDs and left at
+  least one duplicate/phantom in place (`light.arch` vs
+  `light.living_room_arch`, both live as of a 2026-08-21 States check — see
+  "Known constraints"). Re-audit against a full States dump before quoting a
+  light count again.
 - **Reconnect-safe.** On any WebSocket drop (HA restart, network blip), the
   app re-fetches full state on reconnect and merges it in rather than trusting
   stale cached values — see `mergeStates`/`rehydrate` in `App.tsx`/
@@ -214,22 +231,36 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
       expected, not a bug. No `temp_trend` attribute is exposed, so trend is
       hardcoded "stable". `sensor.bedroom_bedroom_switch` is deliberately
       excluded (a different device's battery — no Netatmo attribution).
-    - **IKEA air-quality sensor, Living Room** (confirmed 2026-07-23), Zigbee
-      via `dirigera_platform` — local, so `state_changed` arrives promptly,
-      unlike Netatmo's cloud poll:
-      `sensor.living_room_living_room_air_quality_{temperature,humidity,co2,current_pm2_5}`.
+    - **IKEA air-quality sensor, Living Room** (confirmed 2026-07-23,
+      **entity IDs re-confirmed 2026-08-21 after a silent drift** — see
+      below), Zigbee via `dirigera_platform` — local, so `state_changed`
+      arrives promptly, unlike Netatmo's cloud poll. **Current, live IDs:**
+      `sensor.living_room_living_room_sensor_{temperature,humidity,co2,current_pm2_5}`.
       The only sensor of the three families that reports **PM2.5** — hence
       `pm25` being optional on `INDOOR_AIR_SENSORS` entries. `max_measured_pm2_5`
       / `min_measured_pm2_5` are excluded (session extremes, not live readings).
       **Critical:** the Living Room's Tactus room slug is `living`, not
       `living_room` — same landmine as `SWITCH_ROOM_OVERRIDE` below; keying
       this under `living_room` spawns a phantom Living Room card.
-    - **Laundry temp/humidity sensor** (confirmed 2026-07-23):
-      `sensor.kids_room_kids_temperature_{temperature,humidity}`. Physically
-      relocated from the kids' room to the Laundry — HA area/friendly_name
-      now say "Laundry", but the entity_ids were never renamed, so they still
-      carry the old `kids_room` slug. This was formerly the single source for
-      a dedicated `IndoorState` type (now retired — see below); it's now just
+      **Drift incident (2026-08-19–21):** Thread re-pairing during the
+      Eve→MYGGSPRAY migration renamed this device's entities from
+      `..._air_quality_temperature` etc. to `..._sensor_temperature` etc.
+      Because a missing entity fails quiet (`numOrNull` → null, no error),
+      the Living Room's Air card and Devices-board summary silently showed
+      nothing for roughly two days before a fresh States dump caught it.
+      Fixed in `ha-types.ts` 2026-08-21. **Any future re-pairing of this
+      device is a trigger to re-check this map, not just the automations
+      that reference it.**
+    - **Laundry temp/humidity sensor** (confirmed 2026-07-23, **entity IDs
+      re-confirmed 2026-08-21** after the same drift incident above hit this
+      sensor too): **current, live IDs:**
+      `sensor.kids_room_temperature_{temperature,humidity}` — one fewer
+      "temperature" repeat than the original `kids_room_kids_temperature_...`
+      form. Physically relocated from the kids' room to the Laundry — HA
+      area/friendly_name say "Laundry", but the entity_id still carries the
+      historical `kids_room` slug (unaffected by the rename; only the
+      trailing segment changed). This was formerly the single source for a
+      dedicated `IndoorState` type (now retired — see below); it's now just
       another `INDOOR_AIR_SENSORS` entry, temp/humidity only (no CO₂/PM2.5).
       Its `..._battery_percentage` entity is excluded, same convention as the
       other two device families' battery entities.
@@ -255,31 +286,51 @@ DIRIGERA, or Nest directly — HA normalises everything into entities.
     showing meaningless zeros; `OutdoorState.aqi`/`pm25` stay wired at 0 in
     the data layer for when that source arrives.
 
-- **Deferred — still not available in HA:**
-  - `SwitchState`: one curated entry exists (above); no broader plug rollout.
-  - Per-room `SensorState` (motion/temp/humidity/AQI/PM2.5): temp/humidity
-    are wired for Kitchen, Bedroom, Living Room, and Laundry; CO₂ additionally
-    for Kitchen/Bedroom/Living; PM2.5 additionally for Living Room only (see
-    above). Motion and the wider MYGGSPRAY/Matter environmental sensors
-    remain unwired, but the underlying blocker has partially cleared for the
-    MYGGSPRAY ones: your **MYGGSPRAY sensors (bathroom, front door) now
-    report reliably in HA** via `dirigera_platform`. Wiring them into
-    `SensorCard`/`Room.sensors` is real, available work whenever it's
-    prioritized — it's no longer blocked on hardware/integration, just not
-    built.
-  - **Eve motion sensors (laundry, kitchen) are NOT in HA.** Confirmed
-    dead-end: `dirigera_platform`'s Matter coverage is explicitly out of
-    scope for third-party (non-IKEA) devices, and Matter-direct-to-HA is
-    blocked by the Docker-on-Mac setup (no BLE passthrough, no host
-    networking, no HA-owned Thread border router). These two rooms'
-    motion-light automations currently run natively in **Apple Home** as a
-    deliberate fallback, invisible to Tactus/HA. Real fix requires either IKEA
-    hardware replacements for these two sensors, or a Thread/Matter dongle on
-    Linux hardware (a genuine architecture change, not a config tweak).
-  - **Nest doorbell/camera**: not decided. Recommendation on the table was
-    "wire up doorbell/motion/person events only, don't build a live-video
-    card" — battery cameras can't sustain always-on streaming and would fight
-    the wall-panel use case. No action taken either way.
+- **Eve sensors retired, MYGGSPRAY migration complete (2026-08-19).** The
+  Eve motion-sensor dead-end documented in earlier versions of this file no
+  longer applies — **delete, don't amend, if you find an older copy of this
+  section elsewhere.** Eve hardware (laundry, kitchen) has been fully
+  removed. IKEA MYGGSPRAY motion sensors now cover **five** rooms, all
+  reporting reliably in HA via `dirigera_platform`, confirmed live in a
+  2026-08-21 States check: `binary_sensor.bathroom_motion`,
+  `binary_sensor.toilet_sensor`, `binary_sensor.kitchen_sensor`,
+  `binary_sensor.laundry_sensor`, `binary_sensor.front_door_sensor`. The
+  Apple Home fallback layer these two rooms' motion-lighting automations
+  used to run on is gone — laundry and kitchen motion-lighting now run
+  natively in HA (see "Automations" below), same as bathroom/toilet/front
+  door.
+  - **Migration path used, worth reusing for any future re-pairing:**
+    commission the device into **Apple Home first**, then share it to IKEA
+    Home Smart via Matter multi-admin (generate a fresh pairing code in
+    Apple Home immediately before each attempt). Batch commissioning is
+    destabilising — do devices one at a time with pauses for mesh
+    reconvergence. Mains-powered devices join as Thread routers (heavier,
+    more demanding of mesh health); battery sensors join as sleepy end
+    devices, which is why sensors succeeded in cases bulbs initially didn't.
+  - **HomePod minis (bedroom) and the Apple TV (3rd-gen, model A2843) are
+    load-bearing Thread infrastructure** for this setup, not incidental —
+    stale Thread credentials on the HomePods caused real network
+    partitioning during the migration. Treat both as part of the mesh when
+    debugging Thread issues, not just the DIRIGERA hub.
+  - **Toilet is a new, seventh room**, added via this migration —
+    `light.toilet_light_2` (see "Known constraints" for the `_2` naming) and
+    `binary_sensor.toilet_sensor`. Room derivation is automatic
+    (`entity_id.split("_")[0]`), so no code change was needed for the room
+    itself to appear — see the updated room count at the top of this file.
+    This makes the already-accepted house-view swipe tradeoff worse: 7
+    rooms at 3-per-row is **three** rows, not two, and that tradeoff was
+    accepted at six. Worth revisiting, not just re-counting.
+  - `SwitchState`: still one curated entry (`switch.kids_room_usb_lamp`); no
+    broader plug rollout.
+  - Per-room `SensorState` motion is still unwired into `SensorCard`/
+    `Room.sensors` for all five MYGGSPRAY rooms — no longer blocked on
+    hardware, just not built. Temp/humidity/CO₂/PM2.5 coverage (Kitchen,
+    Bedroom, Living Room, Laundry via `INDOOR_AIR_SENSORS`) is unchanged by
+    this migration.
+  - **Nest doorbell/camera**: still not decided. Recommendation on the table
+    remains "wire up doorbell/motion/person events only, don't build a
+    live-video card" — battery cameras can't sustain always-on streaming and
+    would fight the wall-panel use case. No action taken either way.
 
 ## Idle screen (ambient standby)
 
@@ -663,6 +714,35 @@ annoyance.
   (a switch placed under the two-word `"living_room"` slug instead of
   `"living"`). Any new entity naming needs to be checked against this, not
   assumed.
+  - **Live instance of this bug, confirmed 2026-08-21:** the States dump
+    shows both `light.arch` (on) and `light.living_room_arch` (unavailable)
+    — almost certainly one physical fixture under two entity IDs from a
+    re-pairing. `light.arch` slugs to a brand-new phantom room `"arch"`
+    (one word, so it doesn't even hit the two-word landmine above — it's a
+    different failure mode: an orphaned single-word entity_id with no room
+    prefix at all). If confirmed on the panel, the fix is in HA (rename or
+    remove the stale entity), not in Tactus — the room-derivation code is
+    working as designed, the input entity_id is wrong.
+  - **The `_2` suffix on `light.toilet_light_2` does not corrupt room-slug
+    derivation** — `"toilet_light_2".split("_")[0]` is still `"toilet"`,
+    same as a hypothetical `light.toilet_light`. Earlier notes calling this
+    a slug-derivation landmine overstated it. The real (minor, contained)
+    risk is a duplicate light row in the Toilet room if both the `_2` and a
+    non-suffixed ghost entity exist simultaneously. As of the 2026-08-21
+    States dump, only `light.toilet_light_2` exists — no bare
+    `light.toilet_light` — so this is currently a non-issue in practice; any
+    future entity map should reference `_2` explicitly if hand-keying this
+    room.
+  - **Entity ID drift after any re-pairing is a recurring, structural risk**
+    for this whole setup, not a one-off. It already broke the Living Room
+    heater automation once (a re-paired temperature sensor came back under a
+    new entity ID) and silently blanked the Living Room and Laundry
+    `INDOOR_AIR_SENSORS` entries for ~2 days before a fresh States dump
+    caught it (see "Entity mapping" above). **After any Thread reset,
+    hub re-commission, or sensor battery swap: check Settings → Automations
+    for warning triangles, and diff a fresh States dump against
+    `ha-types.ts`'s hardcoded IDs** — don't assume a successful re-pair kept
+    the same entity_id.
 - **Color temperature convention confirmed 2026-07-10 against real DIRIGERA
   devices:** HA reports kelvin directly (`color_temp_kelvin`,
   `min/max_color_temp_kelvin`) for this integration — no mireds conversion
@@ -674,14 +754,49 @@ annoyance.
 - Subscribes to `state_changed` for every HA entity (not a curated
   `subscribe_entities` list as originally scoped). Fine at current scale; a
   larger HA instance might warrant narrowing this.
+- **`dirigera_platform` has a real bug that Tactus's reconnect logic
+  structurally cannot detect.** `hub_event_listener.py` threw
+  `AttributeError: 'NoneType' object has no attribute 'loop'` after an
+  integration reload (`self.hass` was `None` on entity update), which
+  silently stopped that entity from ever emitting `state_changed` again —
+  the WebSocket itself stayed healthy, so `mergeStates`/`rehydrate` never
+  fired, and the panel kept showing a confident, plausible, and wrong value
+  indefinitely. This is a *third* failure mode beyond the `unavailable`/
+  `unknown` collapse documented above — not "no reading," but "a stale
+  reading with nothing to flag it." It's what silently broke the Living
+  Room heater automation. Worth filing upstream against
+  `dirigera_platform`; not yet done. If Tactus ever adds a genuine
+  staleness guard (comparing `last_updated` against expected update
+  frequency per entity), this bug is the motivating case, not the
+  `_2`/phantom-room issues above.
+- **Five HA automations are confirmed live** (all `state: on` in the
+  2026-08-21 dump), replacing the old Apple Home fallback:
+  `automation.bathroom_light_presence_evening_overnight`,
+  `automation.toilet_motion_light`,
+  `automation.kitchen_lights_motion_evening_overnight`,
+  `automation.laundry_lights_motion_evening_overnight`,
+  `automation.living_room_auto_heat_7am_10pm`. All discovered dynamically by
+  the existing `automation.*` pickup — no Tactus code change needed. A
+  staleness guard on the heater automation (checking the Living Room
+  sensor's `last_updated` before triggering) was recommended after it broke
+  twice from entity drift, but is not yet implemented.
 
 ## Open questions / real next items
 
-- **House view still requires a swipe** to see the second row of room cards
-  (6 rooms wrap to 2 rows at 3-per-row and only the first row fits above the
-  fold on the iPad's 820pt viewport). Explicitly accepted as a pragmatic
-  tradeoff over uniform scaling (rejected — broke touch targets) or further
-  IA changes. Live with it and revisit only if it's a real daily annoyance.
+- **House view swipe problem is worse than documented, not resolved.**
+  Originally accepted as a tradeoff at 6 rooms (2 rows at 3-per-row,
+  first row above the fold on the iPad's 820pt viewport). The toilet room
+  (added 2026-08-19) makes it **7 rooms — three rows**, not two. The
+  original tradeoff was explicitly accepted at six; worth deciding whether
+  it still holds at seven rather than assuming it does. (Note: `HomeView`'s
+  post-redesign Rooms card is a single scrollable list, not a 3-per-row
+  grid — confirm whether this swipe problem still applies to the current
+  UI at all, or was inherited language from the pre-redesign `HouseView`
+  that never got re-verified against the new layout.)
+- **Phantom "arch" room, live as of 2026-08-21** — see "Known constraints."
+  `light.arch` and `light.living_room_arch` (unavailable) both exist;
+  confirm on the panel whether this shows as a spurious 8th room, and fix
+  the entity naming in HA rather than patching around it in code.
 - **Grid import/export sign convention unconfirmed** — see entity mapping
   above. Check against a real export event.
 - **`Cache-Control: no-cache` on index.html unproven on the real iPad** —
@@ -690,23 +805,29 @@ annoyance.
   charger via a smart plug, cutting power above ~80% and restoring below
   ~40%, since a kiosked tablet left permanently on charge sits at 100%
   indefinitely and degrades the battery faster than necessary.
-- **Eve sensors (laundry/kitchen)** — architectural dead-end confirmed for
-  HA-native; currently running on Apple Home fallback. Needs a real decision:
-  replace the hardware with IKEA-native sensors, or invest in Thread/Matter
-  hardware on Linux to bring Eve in properly.
 - **Nest doorbell/camera** — no decision taken. Events-only (doorbell press/
   motion/person) was the recommendation; full video was advised against for
   this specific device (battery-powered, WebRTC-only, no HA recording).
-- **Per-room SensorState** — temp/humidity now wired for Kitchen, Bedroom,
-  Living Room, and Laundry (confirmed 2026-07-22 / 2026-07-23); CO₂
-  additionally for Kitchen/Bedroom/Living, PM2.5 additionally for Living
-  Room only. The `EnvironmentBar` Indoor panel now shows temp/humidity as a
-  min–max range across these rooms (the dedicated `IndoorState` single-
-  source type is retired) and CO₂/PM2.5 as averages. Motion is still unwired
-  everywhere, and outdoor AQI/PM2.5 remain unsourced (no entity exists yet).
-  MYGGSPRAY (bathroom/front door) is no longer blocked (reports fine in HA)
-  but not yet wired into `SensorCard`/room UI — real, available work
-  whenever it's a priority.
+- **Per-room `SensorState` motion** — still unwired into `SensorCard`/
+  `Room.sensors` for all five MYGGSPRAY rooms (bathroom, toilet, kitchen,
+  laundry, front door), all reporting reliably. No longer blocked on
+  hardware/integration for any of them — real, available work whenever it's
+  a priority. Outdoor AQI/PM2.5 remain unsourced (no entity exists yet;
+  WAQI is the planned add, per `EnvironmentBar`'s redesign notes above).
+- **Upstream bug report for `dirigera_platform`'s `hub_event_listener.py`
+  crash** — flagged, not filed. See "Known constraints."
+- **Voice control** — proposed: push-to-talk via `conversation/process` over
+  the existing WebSocket (no proxy allowlist change needed), using
+  `webkitSpeechRecognition` on-device. Mic permission behaviour in Guided
+  Access/standalone mode needs early verification before building further.
+- **Mobile layout** — a phone layout remains a planned sibling, not started
+  (per "What this project is" above). Direction discussed: task-first
+  information architecture for a narrower viewport, not responsive
+  breakpoints on the existing wall-panel layout.
+- **Remote access (Tailscale)** — Tactus is LAN-only by design (see
+  "Deployment"), which is the real blocker on a mobile layout being worth
+  building at all, since a phone is most valuable away from home. Recorded
+  here as an open architectural decision, not yet made.
 - Single App Mode — revisit if manually re-arming Guided Access after
   reboots/updates becomes a recurring annoyance.
 

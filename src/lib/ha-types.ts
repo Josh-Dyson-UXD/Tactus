@@ -75,19 +75,30 @@ export function isClimateEntity(id: string) { return CLIMATE_IDS.has(id); }
 // Laundry temp/humidity sensor. co2/pm25 are optional — plain temp/humidity
 // sensors (Laundry) don't report either; only the IKEA sensor reports pm25.
 // Confirmed from HA Dev Tools → States (kitchen/bedroom 2026-07-22, living +
-// laundry 2026-07-23). NB the Living Room slug is `living`, not `living_room`
+// laundry 2026-07-23, re-confirmed against a fresh States dump 2026-08-21
+// after Thread re-pairing renamed both the Living Room and Laundry entities
+// — see below). NB the Living Room slug is `living`, not `living_room`
 // (see mapHAStatesToRooms). Excluded: sensor.bedroom_bedroom_switch (a
 // different device's battery), the IKEA max/min_measured_pm2_5 entities
 // (session extremes, not live), and the Laundry sensor's
 // ..._battery_percentage entity (same battery-exclusion convention as the
 // other two device families).
 //
-// The Laundry entry's entity_ids still carry the "kids_room" slug — this
-// sensor was physically relocated from the kids' room to the Laundry (HA
-// area/friendly_name now say "Laundry"), but its entity_ids were never
-// renamed. It used to be the single source for a now-retired dedicated
-// indoor-reading type; it's now just another per-room sensor like the rest
-// of this map.
+// **Entity IDs drifted 2026-08-19 during Thread re-pairing (post Eve→
+// MYGGSPRAY migration) and went undetected until a fresh States dump on
+// 2026-08-21** — both entities silently returned no data (numOrNull → null)
+// for roughly two days, since a missing entity fails quiet, not loud. Real
+// current IDs:
+//   - Living Room: was `..._air_quality_...`, now `..._sensor_...`
+//     (`sensor.living_room_living_room_sensor_temperature` etc).
+//   - Laundry: was `sensor.kids_room_kids_temperature_...`, now
+//     `sensor.kids_room_temperature_...` (one fewer "kids_room_temperature"
+//     repeat) — still carries the historical "kids_room" slug from its
+//     physical relocation (HA area/friendly_name say "Laundry", entity_id
+//     doesn't), same as before, just re-numbered.
+// Lesson: any entity re-pairing (Thread reset, hub re-commission, sensor
+// battery swap) is a trigger to re-check this map against Dev Tools →
+// States, not just the automations that reference the same entities.
 export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string; co2?: string; pm25?: string }> = {
   kitchen: {
     temp:     "sensor.kitchen_kitchen_temperature",
@@ -100,14 +111,14 @@ export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string
     co2:      "sensor.bedroom_bedroom_carbon_dioxide",
   },
   living: {
-    temp:     "sensor.living_room_living_room_air_quality_temperature",
-    humidity: "sensor.living_room_living_room_air_quality_humidity",
-    co2:      "sensor.living_room_living_room_air_quality_co2",
-    pm25:     "sensor.living_room_living_room_air_quality_current_pm2_5",
+    temp:     "sensor.living_room_living_room_sensor_temperature",
+    humidity: "sensor.living_room_living_room_sensor_humidity",
+    co2:      "sensor.living_room_living_room_sensor_co2",
+    pm25:     "sensor.living_room_living_room_sensor_current_pm2_5",
   },
   laundry: {
-    temp:     "sensor.kids_room_kids_temperature_temperature",
-    humidity: "sensor.kids_room_kids_temperature_humidity",
+    temp:     "sensor.kids_room_temperature_temperature",
+    humidity: "sensor.kids_room_temperature_humidity",
   },
 };
 
