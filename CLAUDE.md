@@ -1,4 +1,46 @@
+# Current release — Home Now (2026-09-27)
+
+The user approved and requested shipping the greenfield mobile design. This
+section supersedes the historical styling/layout rules and the earlier Rooms
+first pass below. Primary UI: `src/components/home/HomeApp.tsx` + `home.css`.
+`App.tsx` now exports that interface; older layout/card components are retained
+but unused. Light is default; user-selected dark mode is saved locally.
+
+- Now / Rooms / Energy / Routines navigation; session Activity from the header.
+- Existing room order and overrides retained; power points were not reassigned.
+- Full searchable entity library includes additional switches/sensors without
+  claiming HA area-registry discovery. Rooms still use existing mappings.
+- Live REST hydration + WebSocket updates in `use-home.ts`, rehydrate on resume
+  and reconnect. Controls disabled until authenticated hydration succeeds.
+- `HAClient.requestService` matches result IDs, rejects errors/timeouts/drops.
+  `home-control.ts` maps commands and verifies requested device state. Accepted
+  scene/automation/button/RGB commands do not falsely claim device confirmation.
+- Sliders debounce 400ms; feedback and per-entity pending state prevent duplicate
+  commands. Bulk lights-off excludes plugs. Lock/cover/button/scene/automation
+  actions show a review before running. Automation manual run bypasses conditions.
+- Activity is session-only, not HA history. No live undo, timed overrides, media
+  playback, or automation explanations. These were concept ideas, not shipped.
+- Safe simulation remains DEV-only at `/?design=home-now`; never in Docker output.
+- Kids Room sensor entities currently report unavailable in HA (verified Sep 27).
+- Validation: 19 Node tests, production build, responsive browser checks and an
+  isolated HTTP/WebSocket server exercising actual release controls and failures.
+
 # Tactus — Smart Home Dashboard
+
+**2026-09-27 mobile-first update:** Josh primarily uses Tactus in a phone or
+computer browser on home Wi-Fi, not as a wall panel. This supersedes the
+kiosk assumptions below. The approved Rooms first layout uses bottom
+navigation below 768px, a room-focused Home with three primary quick actions,
+and a compact energy link. Desktop retains the sidebar and wider summaries.
+Precondition Ghost and Heat Living are also available in Routines. Room order
+is shared between Home and Devices/Rooms. Control sheets fit phones, sliders
+use native touch/keyboard controls, and the idle screen is no longer mounted.
+Visibility/online/bfcache resume restarts the connection and rehydrates;
+connection failures remain visible after initial load. Tests: `npm test`
+requires Node 24+ (development only); Docker build/runtime remains unchanged.
+Automatic device discovery and full command-result feedback are separate
+follow-up work, not part of this layout pass.
+
 
 **2026-09-27 placement update:** Josh confirmed that
 `sensor.kids_room_temperature_temperature` and

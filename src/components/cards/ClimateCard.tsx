@@ -1,3 +1,4 @@
+import { PowerToggle } from "@/components/controls/PowerToggle";
 import { useState, useRef, useEffect } from "react";
 import { Flame, Snowflake, Droplet, Wind, Power, ArrowLeftRight, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -45,14 +46,6 @@ const MODE_LABEL: Record<Exclude<HvacMode, "off">, string> = {
   heat_cool: "Auto",
 };
 
-const ACTION_LABEL: Record<HvacMode, string> = {
-  heat: "HEATING",
-  cool: "COOLING",
-  dry: "DRYING",
-  fan_only: "FAN",
-  heat_cool: "AUTO",
-  off: "OFF",
-};
 
 const FAN_LABEL: Record<string, string> = {
   quiet: "Quiet", low: "Low", medium: "Medium", high: "High", auto: "Auto",
@@ -112,7 +105,7 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
     <>
       {/* Stepper */}
       <div className="flex items-center justify-center gap-6 mb-6" style={{ opacity: isOff ? 0.4 : 1, pointerEvents: isOff ? "none" : "auto" }}>
-        <button className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-default" style={{ width: 52, height: 52, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}
+        <button aria-label="Decrease target temperature" className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-default" style={{ width: 52, height: 52, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}
           disabled={disabled} onClick={() => step_(-step)}>
           <svg viewBox="0 0 24 24" fill="none" className="size-[20px]"><path d="M5 12h14" stroke="var(--tactus-text-secondary)" strokeLinecap="round" strokeWidth="2" /></svg>
         </button>
@@ -126,7 +119,7 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
           </p>
         </div>
 
-        <button className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-default" style={{ width: 52, height: 52, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}
+        <button aria-label="Increase target temperature" className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-default" style={{ width: 52, height: 52, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}
           disabled={disabled} onClick={() => step_(step)}>
           <svg viewBox="0 0 24 24" fill="none" className="size-[20px]"><path d="M12 5v14M5 12h14" stroke="var(--tactus-text-secondary)" strokeLinecap="round" strokeWidth="2" /></svg>
         </button>
@@ -176,11 +169,7 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
       <div className="flex flex-col gap-3 w-full">
         <div className="flex items-center justify-between">
           <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--tactus-text-faint)" }}>{device}</p>
-          <button className="cursor-pointer disabled:cursor-default" disabled={isPending} onClick={() => onTogglePower(isOff)} style={{ animation: pulse }}>
-            <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>
-              {isError ? "ERROR" : isPending ? "SYNCING" : ACTION_LABEL[mode]}
-            </p>
-          </button>
+          <PowerToggle name={device} on={!isOff} pending={isPending} unavailable={isError} onToggle={() => onTogglePower(isOff)} />
         </div>
         <div className="rounded-tactus-xl p-6" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
           {controls}
@@ -211,15 +200,9 @@ export function ClimateCard({ state, onTogglePower, onSetMode, onSetTemp, onSetF
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center px-[10px] py-[4px] rounded-full relative cursor-pointer disabled:cursor-default" style={{ background: withAlpha(accentHex, isOff ? 0.06 : 0.13), animation: pulse }}
-            disabled={isPending} onClick={() => onTogglePower(isOff)}>
-            <div aria-hidden className="absolute inset-0 rounded-full pointer-events-none" style={{ border: `1px solid ${withAlpha(accentHex, 0.25)}` }} />
-            <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOff ? "var(--tactus-text-muted)" : accent }}>
-              {isError ? "ERROR" : isPending ? "SYNCING" : ACTION_LABEL[mode]}
-            </p>
-          </button>
+          <PowerToggle name={device} on={!isOff} pending={isPending} unavailable={isError} onToggle={() => onTogglePower(isOff)} />
           {onClose && (
-            <button onClick={onClose} className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity" style={{ width: 32, height: 32, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
+            <button aria-label="Close controls" onClick={onClose} className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity" style={{ width: 32, height: 32, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
               <X size={14} color="var(--tactus-text-secondary)" />
             </button>
           )}

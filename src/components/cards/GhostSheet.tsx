@@ -1,3 +1,4 @@
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 import { X, Volume2, Lightbulb, Zap, ShieldAlert, UserCog, PackageOpen, Package, PanelTop, Wind, Car } from "lucide-react";
 import type { TeslaState, ControlStatus, TeslaControlKey, TeslaActions, SeatHeaterLevel, SteeringHeaterLevel, ClimatePreset } from "@/types";
 import { withAlpha } from "@/lib/helpers";
@@ -104,9 +105,10 @@ const CLIMATE_PRESET_OPTIONS: { value: ClimatePreset; label: string }[] = [
 export function GhostSheet({ tesla, control, actions, onClose }: {
   tesla: TeslaState; control: Record<TeslaControlKey, ControlStatus>; actions: TeslaActions; onClose: () => void;
 }) {
+  const dialogRef = useDialogFocus(onClose);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
-      <div className="flex flex-col rounded-tactus-2xl" style={{ width: 460, maxHeight: "86vh", background: "var(--tactus-bg-raised)", border: "1px solid var(--tactus-border-default)" }} onClick={(e) => e.stopPropagation()}>
+    <div className="tactus-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Ghost controls" className="tactus-sheet flex flex-col rounded-tactus-2xl" style={{ width: 460, maxHeight: "86vh", background: "var(--tactus-bg-raised)", border: "1px solid var(--tactus-border-default)" }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 pb-5 shrink-0">
           <div className="flex items-center gap-3">
@@ -123,7 +125,7 @@ export function GhostSheet({ tesla, control, actions, onClose }: {
               <p style={{ fontFamily: "var(--tactus-font-mono)", fontWeight: 300, fontSize: 20, color: "var(--tactus-text-primary)", lineHeight: 1 }}>{round(tesla.batteryPct)}%</p>
               <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 11, color: "var(--tactus-text-muted)", marginTop: 2 }}>{round(tesla.rangeKm)} km</p>
             </div>
-            <button onClick={onClose} className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity" style={{ width: 32, height: 32, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
+            <button aria-label="Close controls" onClick={onClose} className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity" style={{ width: 32, height: 32, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
               <X size={14} color="var(--tactus-text-secondary)" />
             </button>
           </div>

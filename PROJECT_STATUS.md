@@ -1,4 +1,26 @@
+## 2026-09-27 — Home Now release
+
+Approved mobile-first redesign implemented as the main production UI. New
+HomeApp/useHome path replaces the old App orchestration. Includes live commands,
+acknowledgement/error handling, device confirmation, responsive light/dark views,
+room/device search, real routines, energy and Ghost controls. Power-point placement
+unchanged. Kids Room sensors remain unavailable upstream. No timed overrides or
+live undo. See the current-release section in CLAUDE.md for architecture/limits.
+
 # Tactus — project status (portable summary)
+
+## Browser-first layout — 2026-09-27
+
+Primary use is now phone and desktop browsers on home Wi-Fi. The approved
+Rooms first design has responsive bottom navigation, room-first Home,
+compact mobile energy summary, responsive device and energy views, and
+phone-width control sheets. Existing device mappings and power points stay
+unchanged. Home and Rooms share the chosen room order. Idle takeover is
+removed; returning to the page refreshes its Home Assistant connection.
+A persistent error banner identifies stale/offline data. Reconnect regression
+tests are in `tests/` (`npm test`, Node 24+). Automatic discovery is still
+planned. Older wall-panel-specific notes below are historical.
+
 
 ## Kids Room update — 2026-09-27
 

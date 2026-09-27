@@ -131,7 +131,7 @@ function GhostBlock({ tesla, control, actions, onOpenSheet }: {
   tesla: TeslaState; control: Record<TeslaControlKey, ControlStatus>; actions: TeslaActions; onOpenSheet: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-5 rounded-tactus-xl p-6" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
+    <div className="tactus-ghost-block flex flex-col gap-5 rounded-tactus-xl p-6" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center rounded-tactus-md size-[40px]" style={{ background: withAlpha(CAR_HEX, 0.13) }}>
@@ -190,10 +190,10 @@ export function EnergyView({ solar, powerwall, grid, tesla, homeLoad, teslaContr
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
-      <div className="p-8 flex flex-col gap-6">
+      <div className="tactus-page p-8 flex flex-col gap-6">
         <h1 style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 22, fontWeight: 500, color: "var(--tactus-text-primary)" }}>Energy</h1>
 
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+        <div className="tactus-energy-grid grid gap-4">
           <SolarStat solar={solar} />
           <PowerwallStat powerwall={powerwall} />
           <GridStat grid={grid} />

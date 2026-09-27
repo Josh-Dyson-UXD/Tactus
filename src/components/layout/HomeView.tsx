@@ -1,6 +1,7 @@
-import { Sun, BatteryMedium, Car, Power, Moon, LogOut, Wind, Flame } from "lucide-react";
+import { Sun, BatteryMedium, Car, Power, Moon, LogOut, Wind, Flame, Sofa, CookingPot, BedDouble, Blocks, Bath, WashingMachine, DoorClosed, DoorOpen, ChevronRight, LayoutGrid } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Room, OutdoorState, SolarState, PowerwallState, TeslaState, QuickActionId, HvacMode } from "@/types";
+import { compareRooms } from "@/lib/room-order";
 import { withAlpha } from "@/lib/helpers";
 import { CONDITION } from "@/components/layout/EnvironmentBar";
 
@@ -8,10 +9,9 @@ const round = (n: number) => Math.round(n);
 
 const CO2_ELEVATED = 800; // matches EnvironmentBar's co2Color amber threshold
 
-const ROOM_ORDER = ["living", "kitchen", "bedroom", "kids", "bathroom", "laundry", "toilet", "front"];
-const roomPosition = (id: string) => {
-  const index = ROOM_ORDER.indexOf(id);
-  return index === -1 ? ROOM_ORDER.length : index;
+const ROOM_ICONS: Record<string, LucideIcon> = {
+  living: Sofa, kitchen: CookingPot, bedroom: BedDouble, kids: Blocks,
+  bathroom: Bath, laundry: WashingMachine, toilet: DoorClosed, front: DoorOpen,
 };
 
 const CLIMATE_MODE_COLOR: Record<HvacMode, string> = {
@@ -43,7 +43,7 @@ const QUICK_ACTIONS: { id: QuickActionId; label: string; Icon: LucideIcon }[] = 
   { id: "good_night", label: "Good Night", Icon: Moon },
   { id: "away", label: "Away", Icon: LogOut },
   { id: "precondition", label: "Precondition", Icon: Wind },
-  { id: "heat_living", label: "Heat Living", Icon: Flame },
+  { id: "heat_living", label: "Heat Living", Icon: Flame, Sofa, CookingPot, BedDouble, Blocks, Bath, WashingMachine, DoorClosed, DoorOpen, ChevronRight, LayoutGrid },
 ];
 
 function EnergyColumn({ Icon, iconColor, label, value, sub }: { Icon: LucideIcon; iconColor: string; label: string; value: string; sub: string }) {
@@ -75,12 +75,14 @@ export function HomeView({ rooms, outdoor, solar, powerwall, tesla, onNavigateRo
   const roomRows = rooms
     .map((room) => {
       const lightsOn = room.lights.filter((l) => l.cardState === "on").length;
+      const plugsOn = room.switches.filter((s) => s.isOn).length;
       const climateUnit = room.climate[0];
       const tempSensor = room.sensors.find((s) => s.data.kind === "temp");
       const co2Sensor = room.sensors.find((s) => s.data.kind === "co2");
 
       const parts: { text: string; color: string }[] = [];
       if (lightsOn > 0) parts.push({ text: `${lightsOn} light${lightsOn > 1 ? "s" : ""}`, color: "var(--tactus-text-secondary)" });
+      if (plugsOn > 0) parts.push({ text: `${plugsOn} plug${plugsOn > 1 ? "s" : ""}`, color: "var(--tactus-text-secondary)" });
       if (climateUnit && climateUnit.mode !== "off") {
         parts.push({ text: `${CLIMATE_MODE_LABEL[climateUnit.mode]} ${climateUnit.targetTemp ?? "—"}°`, color: CLIMATE_MODE_COLOR[climateUnit.mode] });
       }
@@ -89,30 +91,39 @@ export function HomeView({ rooms, outdoor, solar, powerwall, tesla, onNavigateRo
         parts.push({ text: `CO₂ ${co2Sensor.data.co2}`, color: "var(--tactus-amber)" });
       }
 
-      const active = lightsOn > 0 || (climateUnit ? climateUnit.mode !== "off" : false);
-      return { room, active, parts };
+      const active = lightsOn > 0 || plugsOn > 0 || (climateUnit ? climateUnit.mode !== "off" : false);
+      const temperature = tempSensor?.data.kind === "temp" ? `${tempSensor.data.tempC.toFixed(1)}°` : null;
+      const activity = [
+        lightsOn > 0 ? `${lightsOn} light${lightsOn === 1 ? "" : "s"} on` : "",
+        plugsOn > 0 ? `${plugsOn} plug${plugsOn === 1 ? "" : "s"} on` : "",
+        climateUnit && climateUnit.mode !== "off" ? CLIMATE_MODE_LABEL[climateUnit.mode] : "",
+      ].filter(Boolean).join(" · ");
+      const summary = activity || (room.lights.length || room.switches.length ? "All off" : room.sensors.length ? "Environment" : "No readings");
+      const airAlert = co2Sensor?.data.kind === "co2" && co2Sensor.data.co2 >= CO2_ELEVATED ? `CO₂ ${co2Sensor.data.co2}` : null;
+      return { room, active, parts, temperature, summary, airAlert };
     })
-    .sort((a, b) => roomPosition(a.room.id) - roomPosition(b.room.id));
+    .sort((a, b) => compareRooms(a.room, b.room));
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
-      <div className="p-8 flex flex-col gap-8">
+      <div className="tactus-page tactus-home p-8 flex flex-col gap-8">
+        <div className="tactus-mobile-brand" aria-hidden="true"><span />TACTUS</div>
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 22, fontWeight: 500, color: "var(--tactus-text-primary)" }}>My Home</h1>
+        <div className="tactus-home-header flex items-center justify-between">
+          <h1 className="tactus-home-title" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 22, fontWeight: 500, color: "var(--tactus-text-primary)" }}>My Home</h1>
           <div className="flex items-center gap-2">
             <ConditionIcon size={16} color="var(--tactus-text-muted)" />
             <span style={{ fontFamily: "var(--tactus-font-mono)", fontWeight: 300, fontSize: 18, color: "var(--tactus-blue-light)" }}>
               {outdoor.tempC !== null ? `${round(outdoor.tempC)}°` : "—"}
             </span>
-            <span style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 13, color: "var(--tactus-text-muted)" }}>
+            <span className="tactus-weather-detail" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 13, color: "var(--tactus-text-muted)" }}>
               {round(outdoor.humidity)}% · {condition.label}
             </span>
           </div>
         </div>
 
         {/* Energy overview */}
-        <button onClick={onOpenEnergy} className="rounded-tactus-xl overflow-hidden text-left cursor-pointer hover:opacity-90 transition-opacity"
+        <button onClick={onOpenEnergy} className="tactus-home-energy rounded-tactus-xl overflow-hidden text-left cursor-pointer hover:opacity-90 transition-opacity"
           style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
           <div className="flex divide-x" style={{ borderColor: "var(--tactus-border-subtle)" }}>
             <EnergyColumn Icon={Sun} iconColor="var(--tactus-amber)" label="Solar"
@@ -125,12 +136,12 @@ export function HomeView({ rooms, outdoor, solar, powerwall, tesla, onNavigateRo
         </button>
 
         {/* Quick actions */}
-        <div>
+        <div className="tactus-home-actions">
           <p style={{ ...eyebrow, marginBottom: 10 }}>Quick actions</p>
-          <div className="rounded-tactus-xl overflow-hidden flex divide-x" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)", borderColor: "var(--tactus-border-subtle)" }}>
+          <div className="tactus-quick-actions rounded-tactus-xl overflow-hidden flex divide-x" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)", borderColor: "var(--tactus-border-subtle)" }}>
             {QUICK_ACTIONS.map(({ id, label, Icon }) => (
               <button key={id} onClick={() => onQuickAction(id)}
-                className="flex-1 flex flex-col items-center justify-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                className={`flex-1 flex flex-col items-center justify-center gap-2 cursor-pointer hover:opacity-80 transition-opacity ${id === "precondition" || id === "heat_living" ? "tactus-secondary-action" : ""}`}
                 style={{ padding: "18px 8px" }}>
                 <Icon size={18} color="var(--tactus-text-secondary)" />
                 <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 11, fontWeight: 600, color: "var(--tactus-text-secondary)", textAlign: "center" }}>{label}</p>
@@ -140,23 +151,26 @@ export function HomeView({ rooms, outdoor, solar, powerwall, tesla, onNavigateRo
         </div>
 
         {/* Rooms */}
-        <div>
-          <p style={{ ...eyebrow, marginBottom: 10 }}>Rooms</p>
+        <div className="tactus-home-rooms">
+          <p className="tactus-section-heading" style={{ ...eyebrow, marginBottom: 10 }}>Rooms<span className="tactus-mobile-only">{rooms.length}</span></p>
           <div className="rounded-tactus-xl overflow-hidden" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
-            {roomRows.map(({ room, active, parts }, i) => (
+            {roomRows.map(({ room, active, parts, temperature, summary, airAlert }, i) => {
+              const RoomIcon = ROOM_ICONS[room.id] ?? LayoutGrid;
+              return (
               <button key={room.id} onClick={() => onNavigateRoom(room.id)}
-                className="flex items-center justify-between w-full text-left cursor-pointer hover:opacity-90 transition-opacity"
+                className="tactus-room-row flex items-center justify-between w-full text-left cursor-pointer hover:opacity-90 transition-opacity"
                 style={{ padding: "14px 20px", borderBottom: i < roomRows.length - 1 ? "1px solid var(--tactus-border-subtle)" : "none" }}>
                 <div className="flex items-center gap-3">
-                  <div style={{
+                  <RoomIcon className="tactus-room-icon" size={20} color={active ? "var(--tactus-amber)" : "var(--tactus-text-secondary)"} />
+                  <div className="tactus-room-dot" style={{
                     width: 8, height: 8, borderRadius: "50%",
                     background: active ? "var(--tactus-amber)" : "var(--tactus-border-default)",
                     boxShadow: active ? `0 0 8px 0 ${withAlpha("#F59E0B", 0.5)}` : "none",
                   }} />
-                  <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: active ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{room.name}</p>
+                  <div className="tactus-room-label"><p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: active ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{room.name}</p><span className="tactus-mobile-only tactus-room-activity">{summary}{airAlert && <span style={{ color: "var(--tactus-amber)" }}> · {airAlert}</span>}</span></div>
                 </div>
                 {parts.length > 0 && (
-                  <div className="flex items-center gap-2">
+                  <div className="tactus-room-summary flex items-center gap-2">
                     {parts.map((p, idx) => (
                       <span key={idx} style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 12, color: p.color }}>
                         {p.text}{idx < parts.length - 1 ? " ·" : ""}
@@ -164,10 +178,13 @@ export function HomeView({ rooms, outdoor, solar, powerwall, tesla, onNavigateRo
                     ))}
                   </div>
                 )}
+                <div className="tactus-mobile-room-reading">{temperature && <span>{temperature}</span>}<ChevronRight size={15} aria-hidden="true" /></div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
+        <button className="tactus-mobile-energy" onClick={onOpenEnergy} aria-label="View energy and Ghost"><span><Sun size={15} />{solar.generatingKw.toFixed(1)} kW</span><span><BatteryMedium size={15} />{round(powerwall.pct)}%</span><span><Car size={15} />{round(tesla.batteryPct)}%</span><ChevronRight size={14} /></button>
       </div>
     </div>
   );

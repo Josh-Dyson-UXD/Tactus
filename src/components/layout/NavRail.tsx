@@ -10,7 +10,7 @@ const NAV_ITEMS: { id: MainView; label: string; Icon: LucideIcon }[] = [
   { id: "home", label: "Home", Icon: Home },
   { id: "devices", label: "Devices", Icon: LayoutGrid },
   { id: "energy", label: "Energy", Icon: Zap },
-  { id: "automations", label: "Auto", Icon: Wand2 },
+  { id: "automations", label: "Routines", Icon: Wand2 },
 ];
 
 // The persistent app frame (redesign Phase 1) — replaces the old full-screen
@@ -28,18 +28,18 @@ export function NavRail({ active, onNavigate, alerts }: {
   const mm = String(now.getMinutes()).padStart(2, "0");
 
   return (
-    <nav className="flex flex-col items-center shrink-0" style={{ width: 66, height: "100vh", background: "var(--tactus-bg-recessed)", borderRight: "1px solid var(--tactus-border-subtle)", paddingTop: 20, paddingBottom: 16 }}>
+    <nav aria-label="Main navigation" className="tactus-navigation flex flex-col items-center shrink-0" style={{ width: 66, height: "100vh", background: "var(--tactus-bg-recessed)", borderRight: "1px solid var(--tactus-border-subtle)", paddingTop: 20, paddingBottom: 16 }}>
       {/* Mark */}
-      <div className="rounded-tactus-sm" style={{ width: 20, height: 20, background: "var(--tactus-amber)", marginBottom: 28 }} />
+      <div className="tactus-nav-brand rounded-tactus-sm" style={{ width: 20, height: 20, background: "var(--tactus-amber)", marginBottom: 28 }} />
 
       {/* Nav items */}
-      <div className="flex flex-col items-center gap-2 flex-1">
+      <div className="tactus-nav-items flex flex-col items-center gap-2 flex-1">
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const isActive = active === id;
           const hasAlert = !!alerts[id];
           return (
-            <button key={id} onClick={() => onNavigate(id)}
-              className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-opacity hover:opacity-90"
+            <button key={id} aria-current={isActive ? "page" : undefined} onClick={() => onNavigate(id)}
+              className="tactus-nav-item flex flex-col items-center justify-center gap-1 cursor-pointer transition-opacity hover:opacity-90"
               style={{ width: 52, height: 52, borderRadius: 12, background: isActive ? withAlpha(AMBER_HEX, 0.12) : "transparent" }}>
               <div className="relative">
                 <Icon size={18} color={isActive ? "var(--tactus-amber)" : "var(--tactus-text-muted)"} />
@@ -50,14 +50,14 @@ export function NavRail({ active, onNavigate, alerts }: {
                   }} />
                 )}
               </div>
-              <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 8.5, fontWeight: 600, color: isActive ? "var(--tactus-amber)" : "var(--tactus-text-muted)", lineHeight: 1 }}>{label}</p>
+              <p className="tactus-nav-label" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 11, fontWeight: 600, color: isActive ? "var(--tactus-amber)" : "var(--tactus-text-muted)", lineHeight: 1 }}>{id === "devices" ? <><span className="tactus-desktop-only">Devices</span><span className="tactus-mobile-only">Rooms</span></> : label}</p>
             </button>
           );
         })}
       </div>
 
       {/* Clock */}
-      <p style={{ fontFamily: "var(--tactus-font-mono)", fontSize: 11, fontWeight: 400, color: "var(--tactus-text-muted)" }}>{hh}:{mm}</p>
+      <p className="tactus-nav-clock" style={{ fontFamily: "var(--tactus-font-mono)", fontSize: 11, fontWeight: 400, color: "var(--tactus-text-muted)" }}>{hh}:{mm}</p>
     </nav>
   );
 }

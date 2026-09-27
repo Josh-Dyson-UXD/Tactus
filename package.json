@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "dev": "vite",
     "server": "npm install --prefix server && npm run start --prefix server"
   },

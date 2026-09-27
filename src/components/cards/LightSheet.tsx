@@ -1,3 +1,5 @@
+import { PowerToggle } from "@/components/controls/PowerToggle";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 import { useState, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 import { COLORS } from "@/types";
@@ -28,6 +30,7 @@ export function LightSheet({ state, room, onToggle, onBrightness, onColor, onCol
   onColorTemp: (kelvin: number) => void;
   onClose: () => void;
 }) {
+  const dialogRef = useDialogFocus(onClose);
   const { device, cardState, brightness, selectedColor, colorMode, colorTempKelvin, colorTempRange } = state;
   const isOn = cardState === "on", isPending = cardState === "pending", isError = cardState === "error";
   const accent = isError ? "#EF4444" : (isOn || isPending) ? (colorMode === "temp" && colorTempKelvin ? kelvinToHex(colorTempKelvin) : selectedColor.hex) : "#475569";
@@ -62,8 +65,8 @@ export function LightSheet({ state, room, onToggle, onBrightness, onColor, onCol
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
-      <div className="flex flex-col gap-6 rounded-tactus-2xl p-6" style={{ width: 380, background: "var(--tactus-bg-raised)", border: isError ? "1px solid rgba(239,68,68,0.4)" : "1px solid var(--tactus-border-default)" }} onClick={(e) => e.stopPropagation()}>
+    <div className="tactus-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Light controls" className="tactus-sheet flex flex-col gap-6 rounded-tactus-2xl p-6" style={{ width: 380, background: "var(--tactus-bg-raised)", border: isError ? "1px solid rgba(239,68,68,0.4)" : "1px solid var(--tactus-border-default)" }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -78,14 +81,8 @@ export function LightSheet({ state, room, onToggle, onBrightness, onColor, onCol
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => onToggle(!isOn)} disabled={isError || isPending}
-              className="flex items-center px-[10px] py-[4px] rounded-full relative cursor-pointer disabled:cursor-default"
-              style={{ background: withAlpha(accent, isOn ? 0.13 : 0.06), animation: pulse }}>
-              <p className="text-[11px] font-bold uppercase leading-none" style={{ fontFamily: "var(--tactus-font-sans)", color: isOn ? accent : "var(--tactus-text-muted)" }}>
-                {isError ? "ERROR" : isPending ? "SYNCING" : isOn ? "ON" : "OFF"}
-              </p>
-            </button>
-            <button onClick={onClose} className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity" style={{ width: 32, height: 32, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
+            <PowerToggle name={device} on={isOn} pending={isPending} unavailable={isError} onToggle={() => onToggle(!isOn)} />
+            <button aria-label="Close controls" onClick={onClose} className="flex items-center justify-center rounded-full cursor-pointer hover:opacity-80 transition-opacity" style={{ width: 32, height: 32, background: "var(--tactus-bg-base)", border: "1px solid var(--tactus-border-default)" }}>
               <X size={14} color="var(--tactus-text-secondary)" />
             </button>
           </div>
@@ -104,9 +101,9 @@ export function LightSheet({ state, room, onToggle, onBrightness, onColor, onCol
         {colorMode === "rgb" && (
           <div className="flex flex-col gap-3">
             <p style={eyebrow}>Colour</p>
-            <div className="flex gap-3 items-center">
+            <div className="tactus-colour-choices flex gap-3 items-center">
               {COLORS.map((c) => (
-                <button key={c.id} className="relative shrink-0 size-[32px] rounded-full cursor-pointer" onClick={() => onColor(c as Color)}>
+                <button key={c.id} aria-label={c.label} aria-pressed={c.id === selectedColor.id} className="relative shrink-0 size-[32px] rounded-full cursor-pointer" onClick={() => onColor(c as Color)}>
                   <svg viewBox="0 0 32 32" fill="none" className="size-full">
                     {c.id === selectedColor.id && <rect x="1" y="1" width="30" height="30" rx="15" stroke={c.hex} strokeWidth="2" />}
                     <circle cx="16" cy="16" r="12" fill={c.hex} />

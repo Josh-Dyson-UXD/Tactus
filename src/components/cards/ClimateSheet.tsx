@@ -1,3 +1,4 @@
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { ClimateState, HvacMode } from "@/types";
 import { ClimateCard } from "@/components/cards/ClimateCard";
 
@@ -16,9 +17,10 @@ export function ClimateSheet({ state, onTogglePower, onSetMode, onSetTemp, onSet
   onSetFan: (fan: string) => void;
   onClose: () => void;
 }) {
+  const dialogRef = useDialogFocus(onClose);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
-      <div style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+    <div className="tactus-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Climate controls" className="tactus-sheet" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
         <ClimateCard state={state} embedded={false} onClose={onClose}
           onTogglePower={onTogglePower} onSetMode={onSetMode} onSetTemp={onSetTemp} onSetFan={onSetFan} />
       </div>

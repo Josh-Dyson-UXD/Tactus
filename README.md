@@ -1,8 +1,8 @@
 
   # Tactus
 
-  A smart-home control dashboard for Home Assistant, built for a wall-mounted
-  tablet. Originally a Figma Make export ("Create Interactive Light Switch",
+  A smart-home control dashboard for Home Assistant, built for phone and desktop
+  browsers on the home network. Originally a Figma Make export ("Create Interactive Light Switch",
   https://www.figma.com/design/mwTRoo0lqQZPc4U9okSQPj/Create-Interactive-Light-Switch).
 
   ## Development
@@ -63,4 +63,24 @@
   if `dist/` hasn't changed) to pick it up, and revoke the old token in HA
   once the new one is confirmed working. The token never appears in the
   browser at any point, so rotating it doesn't require touching any client.
-  
+
+## Mobile and desktop interface
+
+Now brings together your scenes, frequently used controls, Ghost and battery
+status. Rooms preserves your preferred order. Energy contains solar, Powerwall
+and consumption. Routines lists the actual Home Assistant scenes and automations.
+Search the device library for other controls and readings. Use the sun button to
+switch appearance. Activity shows command results for the current session.
+
+Controls are live at the normal app address. Commands distinguish Home Assistant
+acceptance from confirmed device state; failed or unconfirmed actions stay visible.
+Returning from a background tab refreshes the connection and current readings.
+
+Run `npm test` with Node 24+ for connection and control regression checks.
+Run `npm run build` for production. Docker remains on Node 20. Tests never control
+real devices. The optional DEV-only `/?design=home-now` route is an isolated
+simulation: it reads a snapshot and changes only local state.
+
+Not included: media playback, persistent HA activity history, timed overrides,
+automatic explanations, or live undo. New entities appear in the device library;
+room assignments retain the existing mapping rules rather than using HA areas.

@@ -50,6 +50,25 @@ export class HAClient {
   private config: HAConfig;
   private ws: WebSocket | null = null;
   private msgId = 1;
+  private authenticated = false;
+  private requests = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+
+  private rejectRequests(message: string) {
+    this.authenticated = false;
+    this.requests.forEach(request => { clearTimeout(request.timer); request.reject(new Error(message)); });
+    this.requests.clear();
+  }
+
+  requestService(domain: string, service: string, serviceData: Record<string, unknown> = {}, target?: Record<string, unknown>): Promise<unknown> {
+    if (!this.authenticated || !this.ws || this.ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error("Home Assistant is disconnected. Try again when connected."));
+    const id = this.msgId++;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { this.requests.delete(id); reject(new Error("Home Assistant did not acknowledge the command. Check the device before retrying.")); }, 10000);
+      this.requests.set(id, { resolve, reject, timer });
+      try { this.ws!.send(JSON.stringify({ id, type: "call_service", domain, service, service_data: serviceData, target })); }
+      catch { clearTimeout(timer); this.requests.delete(id); reject(new Error("Command could not be sent.")); }
+    });
+  }
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private stateListeners = new Set<StateChangedListener>();
   private connectionListeners = new Set<ConnectionListener>();
@@ -89,10 +108,13 @@ export class HAClient {
   // and reconnect automatically if the connection drops.
   connect() {
     if (this.ws) return;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
     const ws = new WebSocket(this.wsUrl);
     this.ws = ws;
 
     ws.onmessage = (ev) => {
+      if (this.ws !== ws) return;
       const msg = JSON.parse(ev.data);
       switch (msg.type) {
         case "auth_required":
@@ -101,6 +123,7 @@ export class HAClient {
           ws.send(JSON.stringify({ type: "auth", access_token: this.config.token ?? "" }));
           break;
         case "auth_ok":
+          this.authenticated = true;
           this.connectionListeners.forEach((l) => l(true));
           this.send({ type: "subscribe_events", event_type: "state_changed" });
           break;
@@ -109,6 +132,16 @@ export class HAClient {
           this.authErrorListeners.forEach((l) => l(msg.message ?? "Home Assistant rejected the access token"));
           ws.close();
           break;
+        case "result": {
+          const request = this.requests.get(msg.id);
+          if (request) {
+            clearTimeout(request.timer);
+            this.requests.delete(msg.id);
+            if (msg.success) request.resolve(msg.result);
+            else request.reject(new Error(msg.error?.message || "Home Assistant rejected the command."));
+          }
+          break;
+        }
         case "event": {
           const data = msg.event?.data;
           if (msg.event?.event_type === "state_changed" && data?.new_state) {
@@ -120,7 +153,9 @@ export class HAClient {
     };
 
     ws.onclose = () => {
+      if (this.ws !== ws) return; // ignore a retired or intentionally closed socket
       this.ws = null;
+      this.rejectRequests("Connection lost. Check the device before retrying.");
       this.connectionListeners.forEach((l) => l(false));
       this.reconnectTimer = setTimeout(() => this.connect(), 3000);
     };
@@ -129,9 +164,18 @@ export class HAClient {
   }
 
   disconnect() {
+    this.rejectRequests("Connection interrupted. Check the device before retrying.");
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.ws?.close();
+    this.reconnectTimer = null;
+    const ws = this.ws;
     this.ws = null;
+    ws?.close();
+  }
+
+  reconnect() {
+    this.disconnect();
+    this.connectionListeners.forEach((listener) => listener(false));
+    this.connect();
   }
 
   private send(payload: Record<string, unknown>) {

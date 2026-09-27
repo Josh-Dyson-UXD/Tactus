@@ -1,5 +1,7 @@
+import { DeviceRow } from "@/components/controls/DeviceRow";
+import { compareRooms } from "@/lib/room-order";
 import { useState } from "react";
-import { Plug, ChevronRight, Flame, Snowflake, Droplet, Wind, Power, ArrowLeftRight } from "lucide-react";
+import { Plug, Lightbulb, Flame, Snowflake, Droplet, Wind, Power, ArrowLeftRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Room, LightState, SwitchState, ClimateState, Color, HvacMode, TempSensor, HumidSensor, CO2Sensor, PM25Sensor } from "@/types";
 import { withAlpha, co2Label } from "@/lib/helpers";
@@ -78,12 +80,12 @@ export function DevicesView({ rooms, onNavigateRoom, onLightToggle, onLightBrigh
     }
   }
 
-  const sortedRooms = [...rooms].sort((a, b) => Number(isRoomActive(b)) - Number(isRoomActive(a)));
+  const sortedRooms = [...rooms].sort(compareRooms);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
-      <div className="p-8 flex flex-col gap-6">
-        <h1 style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 22, fontWeight: 500, color: "var(--tactus-text-primary)" }}>Devices</h1>
+      <div className="tactus-page p-8 flex flex-col gap-6">
+        <h1 style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 22, fontWeight: 500, color: "var(--tactus-text-primary)" }}><span className="tactus-desktop-only">Devices</span><span className="tactus-mobile-only">Rooms</span></h1>
 
         <div className="flex flex-col gap-5">
           {sortedRooms.map((room) => {
@@ -111,7 +113,7 @@ export function DevicesView({ rooms, onNavigateRoom, onLightToggle, onLightBrigh
             return (
               <div key={room.id} className="rounded-tactus-xl overflow-hidden" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)" }}>
                 <button onClick={() => onNavigateRoom(room.id)}
-                  className="flex items-center justify-between w-full text-left cursor-pointer hover:opacity-90 transition-opacity"
+                  className="tactus-device-room-header flex items-center justify-between w-full text-left cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ padding: "14px 20px", borderBottom: rows.length > 0 ? "1px solid var(--tactus-border-subtle)" : "none" }}>
                   <div className="flex items-center gap-3">
                     <div style={{
@@ -133,79 +135,28 @@ export function DevicesView({ rooms, onNavigateRoom, onLightToggle, onLightBrigh
                 </button>
 
                 {rows.map((row, i) => {
-                  const isLast = i === rows.length - 1;
-                  const border = { borderBottom: isLast ? "none" : "1px solid var(--tactus-border-subtle)" };
-
+                  const last = i === rows.length - 1;
                   if (row.kind === "climate") {
                     const c = row.data;
-                    const isOff = c.mode === "off";
-                    const isPending = c.status === "pending";
-                    const isError = c.status === "error";
-                    const accent = isError ? "var(--tactus-red)" : MODE_COLOR[c.mode];
-                    const Icon = isOff ? Power : MODE_ICON[c.mode as Exclude<HvacMode, "off">];
-                    return (
-                      <div key={c.id} className="flex items-center gap-3 w-full cursor-pointer hover:opacity-90 transition-opacity"
-                        style={{ padding: "14px 20px", ...border }} onClick={() => setOpenClimateId(c.id)}>
-                        <Icon size={14} color={isOff ? "var(--tactus-text-muted)" : accent} />
-                        <p className="flex-1" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: isOff ? "var(--tactus-text-secondary)" : "var(--tactus-text-primary)" }}>{c.device}</p>
-                        <p style={{ fontFamily: "var(--tactus-font-mono)", fontSize: 12, color: isError ? "var(--tactus-red)" : isOff ? "var(--tactus-text-muted)" : accent }}>
-                          {isError ? "ERROR" : isOff ? "Off" : `${MODE_LABEL[c.mode]} ${c.targetTemp ?? "—"}°`}
-                        </p>
-                        <button onClick={(e) => { e.stopPropagation(); onClimatePower(c.id, isOff); }} disabled={isError}
-                          className="relative shrink-0 cursor-pointer disabled:cursor-default transition-colors"
-                          style={{ width: 40, height: 24, borderRadius: 9999, background: isError ? withAlpha("#EF4444", 0.25) : !isOff ? withAlpha("#F59E0B", 0.3) : "var(--tactus-border-default)" }}>
-                          <span className="absolute rounded-full" style={{
-                            width: 18, height: 18, top: 3, left: !isOff ? 19 : 3,
-                            background: "#fff", transition: "left 0.18s ease",
-                            animation: isPending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined,
-                          }} />
-                        </button>
-                        <ChevronRight size={16} color="var(--tactus-text-faint)" />
-                      </div>
-                    );
+                    const on = c.mode !== "off";
+                    const Icon = on ? MODE_ICON[c.mode as Exclude<HvacMode, "off">] : Power;
+                    return <DeviceRow key={c.id} name={c.device} detail={on ? `${MODE_LABEL[c.mode]} · ${c.targetTemp ?? "—"}°` : "Off"}
+                      icon={<Icon size={18} color={MODE_COLOR[c.mode]} />} on={on} pending={c.status === "pending"} unavailable={c.status === "error"}
+                      last={last} onOpen={() => setOpenClimateId(c.id)} onToggle={() => onClimatePower(c.id, !on)} />;
                   }
-
                   if (row.kind === "light") {
                     const l = row.data;
-                    const isOn = l.cardState === "on", isPending = l.cardState === "pending", isError = l.cardState === "error";
-                    const swatchHex = isError ? "#EF4444" : isOn || isPending ? (l.colorMode === "rgb" ? l.selectedColor.hex : "#FFF9E5") : "#475569";
-                    const swatchDot = isOn || isPending || isError ? swatchHex : "var(--tactus-border-default)";
-                    return (
-                      <div key={l.id} className="flex items-center gap-3 w-full cursor-pointer hover:opacity-90 transition-opacity"
-                        style={{ padding: "14px 20px", ...border }} onClick={() => setOpenLightId(l.id)}>
-                        <div className="rounded-full shrink-0" style={{ width: 12, height: 12, background: swatchDot, boxShadow: isOn ? `0 0 8px 0 ${withAlpha(swatchHex, 0.5)}` : "none", animation: isPending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined }} />
-                        <p className="flex-1" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: isOn ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{l.device}</p>
-                        {isOn && <p style={{ fontFamily: "var(--tactus-font-mono)", fontSize: 12, color: "var(--tactus-text-muted)" }}>{l.brightness}%</p>}
-                        <button onClick={(e) => { e.stopPropagation(); onLightToggle(l.id, !isOn); }} disabled={isError}
-                          className="relative shrink-0 cursor-pointer disabled:cursor-default transition-colors"
-                          style={{ width: 40, height: 24, borderRadius: 9999, background: isError ? withAlpha("#EF4444", 0.25) : isOn ? withAlpha(swatchHex, 0.9) : "var(--tactus-border-default)" }}>
-                          <span className="absolute rounded-full" style={{
-                            width: 18, height: 18, top: 3, left: isOn ? 19 : 3,
-                            background: "#fff", transition: "left 0.18s ease",
-                            animation: isPending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined,
-                          }} />
-                        </button>
-                        <ChevronRight size={16} color="var(--tactus-text-faint)" />
-                      </div>
-                    );
+                    const on = l.cardState === "on";
+                    return <DeviceRow key={l.id} name={l.device} detail={on ? `${l.brightness}% brightness` : "Off"}
+                      icon={<Lightbulb size={18} color={on ? "var(--tactus-amber)" : "var(--tactus-text-secondary)"} />}
+                      on={on} pending={l.cardState === "pending"} unavailable={l.cardState === "error"}
+                      last={last} onOpen={() => setOpenLightId(l.id)} onToggle={() => onLightToggle(l.id, !on)} />;
                   }
-
                   const s = row.data;
-                  return (
-                    <div key={s.id} className="flex items-center gap-3 w-full" style={{ padding: "14px 20px", ...border }}>
-                      <Plug size={14} color={s.isOn ? "var(--tactus-green)" : "var(--tactus-text-muted)"} />
-                      <p className="flex-1" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: s.isOn ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{s.device}</p>
-                      <button onClick={() => onSwitchToggle(s.id, !s.isOn)} disabled={s.status === "error"}
-                        className="relative shrink-0 cursor-pointer disabled:cursor-default transition-colors"
-                        style={{ width: 40, height: 24, borderRadius: 9999, background: s.status === "error" ? withAlpha("#EF4444", 0.25) : s.isOn ? withAlpha("#22C55E", 0.5) : "var(--tactus-border-default)" }}>
-                        <span className="absolute rounded-full" style={{
-                          width: 18, height: 18, top: 3, left: s.isOn ? 19 : 3,
-                          background: "#fff", transition: "left 0.18s ease",
-                          animation: s.status === "pending" ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined,
-                        }} />
-                      </button>
-                    </div>
-                  );
+                  return <DeviceRow key={s.id} name={s.device} detail={s.isOn ? "On" : "Off"}
+                    icon={<Plug size={18} color={s.isOn ? "var(--tactus-amber)" : "var(--tactus-text-secondary)"} />}
+                    on={s.isOn} pending={s.status === "pending"} unavailable={s.status === "error"}
+                    last={last} onToggle={() => onSwitchToggle(s.id, !s.isOn)} />;
                 })}
               </div>
             );

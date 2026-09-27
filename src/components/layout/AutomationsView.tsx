@@ -1,6 +1,7 @@
+import { PowerToggle } from "@/components/controls/PowerToggle";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Play, Check } from "lucide-react";
-import type { AutomationState, SceneState } from "@/types";
+import { Sparkles, Play, Check, Wind, Flame } from "lucide-react";
+import type { AutomationState, SceneState, QuickActionId } from "@/types";
 import { withAlpha, relativeTime } from "@/lib/helpers";
 
 // "Last run" is rendered from relativeTime() at render time, so on the
@@ -12,7 +13,6 @@ const RUN_PULSE_DURATION = 900;
 
 const AMBER_HEX = "#F59E0B";
 const GREEN_HEX = "#22C55E";
-const RED_HEX   = "#EF4444";
 
 const eyebrow: React.CSSProperties = {
   fontFamily: "var(--tactus-font-sans)", fontSize: 10, fontWeight: 700,
@@ -81,13 +81,13 @@ function AutomationRow({ automation, isLast, onToggle, onRun }: {
     <div className="flex items-center gap-3 w-full" style={{ padding: "14px 20px", borderBottom: isLast ? "none" : "1px solid var(--tactus-border-subtle)" }}>
       <div className="rounded-full shrink-0" style={{ width: 10, height: 10, background: dotColor, boxShadow: isOn ? `0 0 8px 0 ${withAlpha(GREEN_HEX, 0.5)}` : "none" }} />
       <div className="flex-1 min-w-0 flex flex-col gap-[2px]">
-        <p className="truncate" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: isOn ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{name}</p>
+        <p className="tactus-automation-name" style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 14, fontWeight: 500, color: isOn ? "var(--tactus-text-primary)" : "var(--tactus-text-secondary)" }}>{name}</p>
         <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 11, color: subtitleColor }}>{subtitle}</p>
       </div>
 
       {/* Run now — circular, fire-and-forget */}
-      <button onClick={handleRun} disabled={isUnavailable}
-        className="flex items-center justify-center rounded-full shrink-0 cursor-pointer transition-opacity hover:opacity-80 disabled:cursor-default disabled:opacity-30"
+      <button aria-label={`Run ${name}`} onClick={handleRun} disabled={isUnavailable}
+        className="tactus-run-action flex items-center justify-center rounded-full shrink-0 cursor-pointer transition-opacity hover:opacity-80 disabled:cursor-default disabled:opacity-30"
         style={{ width: 30, height: 30, background: runPulsing ? withAlpha(AMBER_HEX, 0.15) : "var(--tactus-bg-base)", border: `1px solid ${runPulsing ? withAlpha(AMBER_HEX, 0.4) : "var(--tactus-border-default)"}` }}>
         {runPulsing ? <Check size={13} color="var(--tactus-amber)" /> : <Play size={12} color="var(--tactus-text-secondary)" />}
       </button>
@@ -95,15 +95,7 @@ function AutomationRow({ automation, isLast, onToggle, onRun }: {
       {/* Enable toggle — same sliding-toggle grammar as DevicesView's plug
           rows / RoomView's switch rows, riding AutomationState.status'
           pending → confirmed cycle. */}
-      <button onClick={() => onToggle(!isOn)} disabled={isPending || isUnavailable}
-        className="relative shrink-0 cursor-pointer disabled:cursor-default"
-        style={{ width: 40, height: 24, borderRadius: 9999, background: isUnavailable ? withAlpha(RED_HEX, 0.15) : isOn ? withAlpha(GREEN_HEX, 0.5) : "var(--tactus-border-default)", opacity: isUnavailable ? 0.5 : 1 }}>
-        <span className="absolute rounded-full" style={{
-          width: 18, height: 18, top: 3, left: isOn ? 19 : 3,
-          background: "#fff", transition: "left 0.18s ease",
-          animation: isPending ? "tactus-pulse var(--tactus-motion-pending-pulse)" : undefined,
-        }} />
-      </button>
+      <PowerToggle name={`Enable ${name}`} on={isOn} pending={isPending} unavailable={isUnavailable} onToggle={() => onToggle(!isOn)} />
     </div>
   );
 }
@@ -113,7 +105,8 @@ function AutomationRow({ automation, isLast, onToggle, onRun }: {
 // navigation, same as every other tab). Data + control wiring is unchanged
 // from before the restyle: App.tsx passes the same automations/scenes/
 // onToggleAutomation/onRunAutomation/onActivateScene it always has.
-export function AutomationsView({ automations, scenes, onToggleAutomation, onRunAutomation, onActivateScene }: {
+export function AutomationsView({ onQuickAction, automations, scenes, onToggleAutomation, onRunAutomation, onActivateScene }: {
+  onQuickAction: (id: QuickActionId) => void;
   automations: AutomationState[];
   scenes: SceneState[];
   onToggleAutomation: (id: string, enable: boolean) => void;
@@ -128,8 +121,9 @@ export function AutomationsView({ automations, scenes, onToggleAutomation, onRun
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>
-      <div className="p-8 flex flex-col gap-6">
-        <h1 style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 22, fontWeight: 500, color: "var(--tactus-text-primary)" }}>Automations</h1>
+      <div className="tactus-page p-8 flex flex-col gap-6">
+        <h1 style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 22, fontWeight: 500, color: "var(--tactus-text-primary)" }}>Routines</h1>
+        <div className="tactus-comfort-actions"><button onClick={() => onQuickAction("precondition")}><Wind size={20} />Precondition Ghost</button><button onClick={() => onQuickAction("heat_living")}><Flame size={20} />Heat Living</button></div>
 
         {/* Scenes — hidden entirely when there are none, rather than an
             empty section header. */}
