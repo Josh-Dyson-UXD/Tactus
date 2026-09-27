@@ -4,6 +4,7 @@ export type HAEntity = {
   attributes: Record<string, unknown>;
   last_changed: string;
   last_updated: string;
+  last_reported?: string;
 };
 
 export type HAStateMap = Record<string, HAEntity>;

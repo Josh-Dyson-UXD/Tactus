@@ -6,6 +6,7 @@ import { compareRooms } from '@/lib/room-order';
 import './home.css';
 import { useHome } from '@/lib/use-home';
 import { LiveRange } from './LiveRange';
+import { EnvironmentSnapshot } from './EnvironmentSnapshot';
 
 const unavailable = (e?: HAEntity) => !e || ['unavailable', 'unknown'].includes(e.state);
 const name = (e?: HAEntity) => String(e?.attributes.friendly_name || e?.entity_id || 'Device').trim();
@@ -88,6 +89,7 @@ export default function HomeApp() {
     <div className="np-scenes">{scenes.map((s,i) => <button key={s.id} onClick={() => makeScene(s.id)}>{i ? <Moon size={23} /> : <Sparkles size={23} />}<strong>{s.name}</strong><ArrowUpRight size={16} /></button>)}<button onClick={() => setPlan({ name:'All lights off',changes:lights.filter(e => !unavailable(e)).map(e => ({id:e.entity_id,state:'off'})),notes:'Power points keep their current settings.' })}><Power size={23}/><strong>Lights off</strong><ArrowUpRight size={16}/></button></div>
     <div className="np-section"><h2>Within reach</h2><button onClick={() => navigate('rooms')}>All rooms <ArrowUpRight size={16}/></button></div>
     <div className="np-favourites"><button className="np-room-hero" onClick={() => {setRoomId('living');setPage('rooms');}}><Lightbulb size={25}/><span>Living Room</span><strong>{rooms.find(r=>r.id==='living')?.lights.filter(l=>l.cardState==='on').length || 0}<small> lights on</small></strong><span className="np-hero-foot">Adjust lighting <ArrowUpRight size={18}/></span></button><button className="np-climate-hero" onClick={() => open(HA_ENTITIES.climateSplitSystem)}><Thermometer size={25}/><span>Split System</span><strong>{String(states[HA_ENTITIES.climateSplitSystem]?.attributes.current_temperature ?? '—')}<small>°</small></strong><span className="np-hero-foot">{reading(HA_ENTITIES.climateSplitSystem)} <ArrowUpRight size={18}/></span></button></div>
+    <EnvironmentSnapshot states={states}/>
     <button className="np-ghost" onClick={() => navigate('ghost')}><Car size={30}/><span><strong>Ghost</strong><small>{reading(HA_ENTITIES.teslaBattery,'%')} battery · {reading(HA_ENTITIES.teslaLock)}</small></span><ArrowUpRight size={20}/></button>
     {lights.some(unavailable) && <button className="np-attention" onClick={() => {navigate('devices');setFilter('unavailable');}}> <span>{lights.filter(unavailable).length} light unavailable</span><ChevronRight size={18}/></button>}
     <button className="np-energy-link" onClick={() => navigate('energy')}><Battery size={19}/><span>Powerwall {reading(HA_ENTITIES.powerwallCharge,'%')}</span><ArrowUpRight size={17}/></button>

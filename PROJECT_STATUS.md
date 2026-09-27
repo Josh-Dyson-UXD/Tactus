@@ -176,3 +176,12 @@ The same discipline applies to this file and `CLAUDE.md` themselves: this
 pass was written against a real repo checkout and a real HA States dump,
 specifically because narrating "what's probably still true" is exactly how
 this file drifted the first time.
+
+### Inside & outside snapshot
+
+Home now includes ranges across configured reporting rooms for temperature,
+humidity and CO₂, with PM2.5 explicitly attributed to its reporting room.
+Expandable per-room readings preserve missing states. Outdoor readings prefer
+front-door sensor reports within six hours, otherwise clearly label weather
+service values. No outdoor air-quality source is configured. Sensor battery
+currently reports 0%; old retained measurements are not treated as current.
