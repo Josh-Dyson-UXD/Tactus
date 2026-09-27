@@ -1,5 +1,16 @@
 # Tactus — project status (portable summary)
 
+## Kids Room update — 2026-09-27
+
+Kids Room now appears in Tactus using the temperature and humidity entities
+previously mapped to Laundry: `sensor.kids_room_temperature_temperature`
+and `sensor.kids_room_temperature_humidity`. Josh confirmed the readings
+should move to Kids Room. Existing power-point assignments are unchanged,
+including Donut in Living Room. This supersedes the sensor placement in the
+older notes below. Live preview verified temperature and humidity readings.
+The Home room list now stays in this order: Living Room, Kitchen, Bedroom,
+Kids Room, Bathroom, Laundry, Toilet, Front Door.
+
 Paste this at the start of a new chat, or drop it into the Tactus Claude
 Project's knowledge, to pick up with full context. `CLAUDE.md` in the repo
 root is the detailed technical spec Claude Code reads automatically — this

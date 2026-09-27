@@ -8,6 +8,12 @@ const round = (n: number) => Math.round(n);
 
 const CO2_ELEVATED = 800; // matches EnvironmentBar's co2Color amber threshold
 
+const ROOM_ORDER = ["living", "kitchen", "bedroom", "kids", "bathroom", "laundry", "toilet", "front"];
+const roomPosition = (id: string) => {
+  const index = ROOM_ORDER.indexOf(id);
+  return index === -1 ? ROOM_ORDER.length : index;
+};
+
 const CLIMATE_MODE_COLOR: Record<HvacMode, string> = {
   heat: "var(--tactus-amber)",
   cool: "var(--tactus-blue)",
@@ -63,7 +69,7 @@ export function HomeView({ rooms, outdoor, solar, powerwall, tesla, onNavigateRo
   const condition = CONDITION[outdoor.condition] ?? { label: outdoor.condition || "—", Icon: Sun };
   const ConditionIcon = condition.Icon;
 
-  // Rooms sorted active-first (anything on), each with a quiet status line
+  // Rooms stay in the preferred household order, each with a quiet status line
   // built from whatever's meaningful — omitting "Off" entirely, since the
   // grey dot already says it's off.
   const roomRows = rooms
@@ -86,7 +92,7 @@ export function HomeView({ rooms, outdoor, solar, powerwall, tesla, onNavigateRo
       const active = lightsOn > 0 || (climateUnit ? climateUnit.mode !== "off" : false);
       return { room, active, parts };
     })
-    .sort((a, b) => Number(b.active) - Number(a.active));
+    .sort((a, b) => roomPosition(a.room.id) - roomPosition(b.room.id));
 
   return (
     <div className="min-h-screen" style={{ background: "var(--tactus-bg-base)" }}>

@@ -1,5 +1,14 @@
 # Tactus — Smart Home Dashboard
 
+**2026-09-27 placement update:** Josh confirmed that
+`sensor.kids_room_temperature_temperature` and
+`sensor.kids_room_temperature_humidity` belong in **Kids Room**, superseding
+the older Laundry placement below. Their mapping now uses slug `kids` and
+display name `Kids Room`. Existing power-point assignments, including Donut
+in Living Room, remain unchanged. Verified against live HA in the local preview.
+Home rooms now use a fixed order: Living Room, Kitchen, Bedroom, Kids Room,
+Bathroom, Laundry, Toilet, Front Door.
+
 This file is the living build spec. Read it before touching code. It defines
 what exists, what doesn't yet, and the rules that keep the system coherent as
 it continues to evolve. The original build (Figma prototype → real app wired

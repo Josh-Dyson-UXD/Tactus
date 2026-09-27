@@ -97,11 +97,17 @@ export function RoomView({ room, onBack, onUpdateRoom, onLightToggle, onLightBri
               <p style={{ fontFamily: "var(--tactus-font-sans)", fontSize: 13, color: "var(--tactus-text-muted)" }}>{activeCount} of {totalCount} active</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          {totalCount > 0 && <div className="flex items-center gap-3">
             <button onClick={allOff} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)", fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-text-secondary)", fontSize: 13, fontWeight: 600 }}>All Off</button>
             <button onClick={allOn} className="flex items-center justify-center px-5 h-[38px] rounded-full cursor-pointer transition-opacity hover:opacity-80" style={{ background: withAlpha("#FFF9E5", 0.1), border: `1px solid ${withAlpha("#FFF9E5", 0.2)}`, fontFamily: "var(--tactus-font-sans)", color: "var(--tactus-warm-white)", fontSize: 13, fontWeight: 600 }}>All On</button>
-          </div>
+          </div>}
         </div>
+
+        {totalCount === 0 && climate.length === 0 && sensors.length === 0 && (
+          <p className="rounded-tactus-xl px-5 py-4" style={{ background: "var(--tactus-bg-recessed)", border: "1px solid var(--tactus-border-subtle)", fontFamily: "var(--tactus-font-sans)", fontSize: 14, color: "var(--tactus-text-muted)" }}>
+            No devices assigned to this room yet.
+          </p>
+        )}
 
         {/* Room brightness — a slim bar, lights only */}
         {lights.length > 0 && (

@@ -72,15 +72,15 @@ export function isClimateEntity(id: string) { return CLIMATE_IDS.has(id); }
 // weather-station-only layer for kitchen/bedroom; now also covers the Living
 // Room IKEA air-quality sensor (Zigbee via dirigera_platform — local, prompt
 // updates, unlike the kitchen/bedroom modules' ~10-min cloud poll) and the
-// Laundry temp/humidity sensor. co2/pm25 are optional — plain temp/humidity
-// sensors (Laundry) don't report either; only the IKEA sensor reports pm25.
+// Kids Room temp/humidity sensor (moved from Laundry per user confirmation
+// 2026-09-27). co2/pm25 are optional — this sensor reports neither.
 // Confirmed from HA Dev Tools → States (kitchen/bedroom 2026-07-22, living +
 // laundry 2026-07-23, re-confirmed against a fresh States dump 2026-08-21
 // after Thread re-pairing renamed both the Living Room and Laundry entities
 // — see below). NB the Living Room slug is `living`, not `living_room`
 // (see mapHAStatesToRooms). Excluded: sensor.bedroom_bedroom_switch (a
 // different device's battery), the IKEA max/min_measured_pm2_5 entities
-// (session extremes, not live), and the Laundry sensor's
+// (session extremes, not live), and the Kids Room sensor's
 // ..._battery_percentage entity (same battery-exclusion convention as the
 // other two device families).
 //
@@ -95,7 +95,8 @@ export function isClimateEntity(id: string) { return CLIMATE_IDS.has(id); }
 //     `sensor.kids_room_temperature_...` (one fewer "kids_room_temperature"
 //     repeat) — still carries the historical "kids_room" slug from its
 //     physical relocation (HA area/friendly_name say "Laundry", entity_id
-//     doesn't), same as before, just re-numbered.
+//     doesn't), same as before, just re-numbered. Placement superseded on
+//     2026-09-27: the user confirmed these readings belong in Kids Room.
 // Lesson: any entity re-pairing (Thread reset, hub re-commission, sensor
 // battery swap) is a trigger to re-check this map against Dev Tools →
 // States, not just the automations that reference the same entities.
@@ -116,7 +117,7 @@ export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string
     co2:      "sensor.living_room_living_room_sensor_co2",
     pm25:     "sensor.living_room_living_room_sensor_current_pm2_5",
   },
-  laundry: {
+  kids: {
     temp:     "sensor.kids_room_temperature_temperature",
     humidity: "sensor.kids_room_temperature_humidity",
   },
@@ -314,6 +315,7 @@ export function mapClimateEntity(entity: HAEntity): ClimateState {
 const ROOM_NAME_OVERRIDE: Record<string, string> = {
   living: "Living Room",
   front: "Front Door",
+  kids: "Kids Room",
 };
 
 function roomNameFromSlug(slug: string): string {
@@ -374,7 +376,7 @@ export function indoorAirSensorsForRoom(states: HAStateMap, slug: string): Senso
 // Switches are placed via the curated SWITCH_ROOM_OVERRIDE map (explicit,
 // not derived), climate via the curated CLIMATE_ROOM_OVERRIDE map (same
 // pattern). Sensors: indoor air sensors (temp/humidity, optionally CO₂
-// and/or PM2.5) are wired for kitchen, bedroom, living, and laundry via
+// and/or PM2.5) are wired for kitchen, bedroom, living, and kids via
 // INDOOR_AIR_SENSORS; every other room's sensors come back [] — the rest of
 // per-room SensorState is still deferred per CLAUDE.md.
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
