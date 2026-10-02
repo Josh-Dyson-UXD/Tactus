@@ -379,6 +379,12 @@ export function indoorAirSensorsForRoom(states: HAStateMap, slug: string): Senso
 // and/or PM2.5) are wired for kitchen, bedroom, living, and kids via
 // INDOOR_AIR_SENSORS; every other room's sensors come back [] — the rest of
 // per-room SensorState is still deferred per CLAUDE.md.
+// Lamps whose entity IDs do not encode their room. Placement confirmed by
+// Josh; keep the existing room slug so this never creates a duplicate room.
+const LIGHT_ROOM_OVERRIDE: Record<string, string> = {
+  "light.shiraz": "living",
+};
+
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomLights = new Map<string, LightState[]>();
   const roomSwitches = new Map<string, SwitchState[]>();
@@ -387,7 +393,7 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   for (const entity of Object.values(states)) {
     if (isLightEntity(entity.entity_id)) {
       const [, objectId] = entity.entity_id.split(".");
-      const roomSlug = (entity.attributes.room as string) ?? objectId.split("_")[0];
+      const roomSlug = LIGHT_ROOM_OVERRIDE[entity.entity_id] ?? (entity.attributes.room as string) ?? objectId.split("_")[0];
       const lights = roomLights.get(roomSlug) ?? [];
       lights.push(mapLightEntity(entity));
       roomLights.set(roomSlug, lights);
