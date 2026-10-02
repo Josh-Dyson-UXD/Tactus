@@ -42,11 +42,18 @@ const HA_WS_URL = HA_REST_BASE.replace(/^http/, "ws") + "/api/websocket";
 // Add to this deliberately, one entry at a time, not by loosening the match.
 const REST_ALLOWLIST = [{ method: "GET", path: "/api/states" }];
 
-function isAllowed(method, pathname) {
-  return REST_ALLOWLIST.some((r) => r.method === method && r.path === pathname);
+// Home Assistant exposes media artwork at a per-entity proxy URL. Keep this
+// narrowly GET-only: unlike the general /api/* surface it cannot invoke HA
+// services, and the real HA bearer token remains server-side.
+function isMediaArtworkPath(method, pathname) {
+  return method === "GET" && pathname.startsWith("/api/media_player_proxy/");
 }
 
-async function proxyRest(req, res, pathname) {
+function isAllowed(method, pathname) {
+  return REST_ALLOWLIST.some((r) => r.method === method && r.path === pathname) || isMediaArtworkPath(method, pathname);
+}
+
+async function proxyRest(req, res, pathname, search = "") {
   if (!isAllowed(req.method, pathname)) {
     res.writeHead(403, { "Content-Type": "text/plain" });
     res.end("Forbidden");
@@ -54,7 +61,7 @@ async function proxyRest(req, res, pathname) {
   }
 
   try {
-    const upstream = await fetch(`${HA_REST_BASE}${pathname}`, {
+    const upstream = await fetch(`${HA_REST_BASE}${pathname}${search}`, {
       method: req.method,
       headers: {
         Authorization: `Bearer ${HA_TOKEN}`,
@@ -63,7 +70,8 @@ async function proxyRest(req, res, pathname) {
     });
     const body = Buffer.from(await upstream.arrayBuffer());
     res.writeHead(upstream.status, {
-      "Content-Type": upstream.headers.get("content-type") || "application/json",
+      "Content-Type": upstream.headers.get("content-type") || "application/octet-stream",
+      "Cache-Control": upstream.headers.get("cache-control") || "private, max-age=30",
     });
     res.end(body);
   } catch (err) {
@@ -139,9 +147,9 @@ function serveStatic(req, res, pathname) {
 // ─── HTTP server ─────────────────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
-  const { pathname } = new URL(req.url, `http://${req.headers.host}`);
+  const { pathname, search } = new URL(req.url, `http://${req.headers.host}`);
   if (pathname.startsWith("/api/")) {
-    proxyRest(req, res, pathname);
+    proxyRest(req, res, pathname, search);
     return;
   }
   serveStatic(req, res, pathname);
