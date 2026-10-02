@@ -25,6 +25,14 @@ export default function HomeApp() {
   const [filter, setFilter] = useState('all');
   const [dismissedEvent, setDismissedEvent] = useState<number | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  // Local media clock: HA reports an authoritative media_position plus the
+  // timestamp it was measured at. Advance that position locally while
+  // playing, then naturally resync whenever HA publishes fresh state.
+  const [mediaNow, setMediaNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setMediaNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('tactus-theme') || 'light'; } catch { return 'light'; } });
   useEffect(() => { try { localStorage.setItem('tactus-theme', theme); } catch {} }, [theme]);
   useEffect(() => {
@@ -68,6 +76,16 @@ export default function HomeApp() {
   const livingFrame = states['media_player.living_room_the_frame'];
   const bedroomHomePod = states['media_player.bedroom_bedroom'];
   const mediaActive = (e?: HAEntity) => !!e && ['playing','paused','buffering'].includes(e.state);
+  const mediaPosition = (e?: HAEntity) => {
+    if (!e) return 0;
+    const reported = Math.max(0, Number(e.attributes.media_position) || 0);
+    if (e.state !== 'playing') return reported;
+    const updated = Date.parse(String(e.attributes.media_position_updated_at || ''));
+    if (!Number.isFinite(updated)) return reported;
+    const duration = Number(e.attributes.media_duration || 0);
+    const position = reported + Math.max(0, (mediaNow - updated) / 1000);
+    return duration > 0 ? Math.min(duration, position) : position;
+  };
   const fmtTime = (value: unknown) => {
     const seconds = Math.max(0, Number(value) || 0);
     const m = Math.floor(seconds / 60), s = Math.floor(seconds % 60);
@@ -94,7 +112,7 @@ export default function HomeApp() {
   </div>;
   const nowPlayingCard = (e: HAEntity) => {
     const duration = Number(e.attributes.media_duration || 0);
-    const position = Number(e.attributes.media_position || 0);
+    const position = mediaPosition(e);
     const artwork = mediaArtwork(e);
     return <button className="np-now-playing" onClick={()=>open(e.entity_id)}>
       {artwork ? <img src={artwork} alt="" /> : <span className="np-media-placeholder"><Tv size={24}/></span>}
@@ -128,7 +146,7 @@ export default function HomeApp() {
     {domain === 'media_player' && <div className={`np-media-detail ${isSpeakerMedia ? 'np-media-detail-speaker' : 'np-media-detail-tv'}`}>
       {mediaArtwork(entity) && <img className="np-media-art" src={mediaArtwork(entity)} alt="" />}
       <div className="np-media-meta"><strong>{String(entity.attributes.media_title || name(entity))}</strong><span>{mediaSubtitle(entity)}</span></div>
-      {Number(entity.attributes.media_duration || 0)>0 && <div className="np-media-timeline"><div><i style={{width:`${Math.min(100,Number(entity.attributes.media_position||0)/Number(entity.attributes.media_duration)*100)}%`}}/></div><span>{fmtTime(entity.attributes.media_position)} <b>/</b> {fmtTime(entity.attributes.media_duration)}</span></div>}
+      {Number(entity.attributes.media_duration || 0)>0 && <div className="np-media-timeline"><div><i style={{width:`${Math.min(100,mediaPosition(entity)/Number(entity.attributes.media_duration)*100)}%`}}/></div><span>{fmtTime(mediaPosition(entity))} <b>/</b> {fmtTime(entity.attributes.media_duration)}</span></div>}
       {mediaTransport(entity)}
       {entity.attributes.volume_level != null && <label className="np-range"><span className="np-media-volume-label"><Volume2 size={17}/> Volume</span><output>{Math.round(Number(entity.attributes.volume_level)*100)}%</output><LiveRange aria-label="Volume" type="range" min="0" max="1" step=".01" value={Number(entity.attributes.volume_level)} disabled={blocked(entity)} onChange={e=>mediaAction(entity,'volume_set',{volume_level:Number(e.target.value)})}/></label>}
       {Array.isArray(entity.attributes.source_list) && (entity.attributes.source_list as string[]).length>0 && <label className="np-field">Source<select value={String(entity.attributes.source || entity.attributes.app_name || '')} disabled={blocked(entity)} onChange={e=>mediaAction(entity,'select_source',{source:e.target.value})}><option value="">Choose…</option>{(entity.attributes.source_list as string[]).map(source=><option key={source} value={source}>{source}</option>)}</select></label>}
