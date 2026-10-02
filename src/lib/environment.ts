@@ -22,7 +22,8 @@ export function outdoorReading(states: HAStateMap, kind: 'temperature'|'humidity
   const timestamp=Date.parse(reportedAt(local)||'');
   // A recent report, not just a retained numeric value, is required for the
   // battery outdoor sensor. last_updated alone can predate unchanged reports.
-  if(value!==null && Number.isFinite(timestamp) && now-timestamp>=0 && now-timestamp<6*60*60*1000) return {value,source:'Outdoor sensor',fallback:false};
+  const disconnected = states['binary_sensor.front_door_outdoor_connectivity']?.state === 'off';
+  if(!disconnected && value!==null && Number.isFinite(timestamp) && now-timestamp>=0 && now-timestamp<6*60*60*1000) return {value,source:'Outdoor sensor',fallback:false};
   const weather=states['weather.forecast_home'];
   const weatherValue=weather && !['unavailable','unknown'].includes(weather.state) ? numeric(weather.attributes[kind]) : null;
   const converted=kind==='temperature' && weather?.attributes.temperature_unit==='°F' && weatherValue!==null ? (weatherValue-32)*5/9 : weatherValue;

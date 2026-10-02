@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { HAClient, mergeStates } from './ha-client';
 import type { HAStateMap } from './ha-client';
 import { commandFor, confirms } from './home-control';
+import { parseForecast, type ForecastType } from './forecast';
 import type { Change, Command } from './home-control';
 export type HomeEvent = { id: number; title: string; time: string; status: 'pending'|'confirmed'|'accepted'|'error'; detail: string };
 
@@ -81,5 +82,10 @@ export function useHome() {
     catch (e) { setError(e instanceof Error?e.message:'Unable to send command'); }
   },[run]);
   const service = useCallback((title: string,id:string,action:string,data:Record<string,unknown>={}) => { void run(title,[{id,domain:id.split('.')[0],service:action,data}]); },[run]);
-  return {states,loaded,connected,error,pending,events,apply,service,retry:()=>client.current?.reconnect()};
+  const getForecast = useCallback(async (type: ForecastType) => {
+    if (!ready.current || !client.current) throw new Error('Reconnect to load the forecast.');
+    const result = await client.current.requestService('weather', 'get_forecasts', {type}, {entity_id:'weather.forecast_home'}, true);
+    return parseForecast(result, 'weather.forecast_home');
+  }, []);
+  return {states,loaded,connected,error,pending,events,apply,service,getForecast,retry:()=>client.current?.reconnect()};
 }

@@ -1,3 +1,18 @@
+# Usability update — 2026-10-02
+
+- Scenes, manual automation runs and house/room lights-off run immediately.
+  Existing lock/cover/button review remains. Pending guards and error feedback remain.
+- Donut is shown and counted as a Living Room light, including bulk lights-off,
+  while retaining its switch entity ID and switch service calls; no dimmer controls.
+- Header Activity, device information, boilerplate and persistent status footer removed.
+  Successful action feedback dismisses after 2.5 seconds; errors stay until dismissed.
+- Home includes Find any device. Inside/outside cards open dedicated views:
+  room readings and daily/hourly forecasts via weather.get_forecasts with response data.
+  An explicitly disconnected outdoor sensor falls back to weather readings.
+  Forecast errors/missing values are shown honestly; forecasts never enter action history.
+- Validation: 28 unit checks, production build, isolated browser control checks,
+  live read-only forecast retrieval. No real device control during verification.
+
 # Current release — Home Now (2026-09-27)
 
 The user approved and requested shipping the greenfield mobile design. This

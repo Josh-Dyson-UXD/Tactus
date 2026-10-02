@@ -109,3 +109,14 @@ test('disconnect rejects in-flight service and ignores old socket results', asyn
   const id=sockets[0].sent.at(-1).id;
   client.reconnect();sockets[0].message({type:'result',id,success:true});await rejected;
 });
+
+test('forecast requests opt into response data and preserve the returned forecast', async t => {
+  const {client,sockets}=setup(t);client.connect();sockets[0].message({type:'auth_ok'});
+  const result=client.requestService('weather','get_forecasts',{type:'daily'},{entity_id:'weather.forecast_home'},true);
+  const wire=sockets[0].sent.at(-1);
+  assert.equal(wire.return_response,true);
+  assert.equal(wire.domain,'weather');
+  const response={response:{'weather.forecast_home':{forecast:[{datetime:'2026-10-02T02:00:00Z',temperature:12}]}}};
+  sockets[0].message({type:'result',id:wire.id,success:true,result:response});
+  assert.deepEqual(await result,response);
+});

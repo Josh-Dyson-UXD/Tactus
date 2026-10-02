@@ -381,8 +381,11 @@ export function indoorAirSensorsForRoom(states: HAStateMap, slug: string): Senso
 // per-room SensorState is still deferred per CLAUDE.md.
 // Lamps whose entity IDs do not encode their room. Placement confirmed by
 // Josh; keep the existing room slug so this never creates a duplicate room.
+export const isLightingEntity = (id: string) => isLightEntity(id) || id === HA_ENTITIES.donutSwitch;
+
 const LIGHT_ROOM_OVERRIDE: Record<string, string> = {
   "light.shiraz": "living",
+  [HA_ENTITIES.donutSwitch]: "living",
 };
 
 export function mapHAStatesToRooms(states: HAStateMap): Room[] {
@@ -391,7 +394,7 @@ export function mapHAStatesToRooms(states: HAStateMap): Room[] {
   const roomClimate = new Map<string, ClimateState[]>();
 
   for (const entity of Object.values(states)) {
-    if (isLightEntity(entity.entity_id)) {
+    if (isLightingEntity(entity.entity_id)) {
       const [, objectId] = entity.entity_id.split(".");
       const roomSlug = LIGHT_ROOM_OVERRIDE[entity.entity_id] ?? (entity.attributes.room as string) ?? objectId.split("_")[0];
       const lights = roomLights.get(roomSlug) ?? [];

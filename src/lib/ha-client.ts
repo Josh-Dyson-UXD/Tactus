@@ -60,13 +60,13 @@ export class HAClient {
     this.requests.clear();
   }
 
-  requestService(domain: string, service: string, serviceData: Record<string, unknown> = {}, target?: Record<string, unknown>): Promise<unknown> {
+  requestService(domain: string, service: string, serviceData: Record<string, unknown> = {}, target?: Record<string, unknown>, returnResponse = false): Promise<unknown> {
     if (!this.authenticated || !this.ws || this.ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error("Home Assistant is disconnected. Try again when connected."));
     const id = this.msgId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.requests.delete(id); reject(new Error("Home Assistant did not acknowledge the command. Check the device before retrying.")); }, 10000);
       this.requests.set(id, { resolve, reject, timer });
-      try { this.ws!.send(JSON.stringify({ id, type: "call_service", domain, service, service_data: serviceData, target })); }
+      try { this.ws!.send(JSON.stringify({ id, type: "call_service", domain, service, service_data: serviceData, target, ...(returnResponse ? { return_response: true } : {}) })); }
       catch { clearTimeout(timer); this.requests.delete(id); reject(new Error("Command could not be sent.")); }
     });
   }

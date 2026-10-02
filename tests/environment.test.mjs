@@ -8,3 +8,15 @@ test('indoor range excludes missing sensors and keeps real zero readings',()=>{a
 test('stale local sensor falls back to weather independently per reading',()=>{const states={'weather.forecast_home':weather,'sensor.front_door_outdoor_temperature':{state:'18.5',last_updated:'2026-09-25T00:00:00Z'},'sensor.front_door_outdoor_humidity':{state:'68',last_reported:'2026-09-27T11:00:00Z'}};assert.equal(outdoorReading(states,'temperature',now).value,8.5);assert.equal(outdoorReading(states,'humidity',now).source,'Outdoor sensor');});
 test('fresh unchanged reports take precedence over older last_updated',()=>{const states={'sensor.front_door_outdoor_temperature':{state:'12',last_updated:'2026-09-25T00:00:00Z',last_reported:'2026-09-27T11:00:00Z'}};assert.equal(outdoorReading(states,'temperature',now).value,12);});
 test('unavailable weather attributes are not shown as current readings',()=>{assert.equal(outdoorReading({'weather.forecast_home':{...weather,state:'unavailable'}},'humidity',now).value,null);});
+
+
+test('disconnected outdoor sensor cannot appear live from retained numeric reports',()=>{
+ const now=Date.now();
+ const states={
+  'sensor.front_door_outdoor_temperature':{state:'22',last_reported:new Date(now).toISOString(),attributes:{}},
+  'binary_sensor.front_door_outdoor_connectivity':{state:'off',attributes:{}},
+  'weather.forecast_home':{state:'rainy',attributes:{temperature:11.5,temperature_unit:'°C'}}
+ };
+ assert.equal(outdoorReading(states,'temperature',now).source,'Weather service');
+ assert.equal(outdoorReading(states,'temperature',now).value,11.5);
+});
