@@ -27,3 +27,13 @@ body:has(.np-app){background:#f4f3ed}body:has(.np-dark){background:#181f22}
 .np-media-transport{display:flex;align-items:center;justify-content:center;gap:16px;margin:20px 0 24px}.np-media-transport button{width:48px;height:48px;border-radius:50%;background:var(--np-bg);display:grid;place-items:center}.np-media-transport .np-media-play{width:58px;height:58px;background:var(--np-fg);color:var(--np-bg)}
 .np-media-volume-label{display:inline-flex;align-items:center;gap:7px}.np-media-companion,.np-media-idle{width:100%;display:flex;align-items:center;gap:14px;background:var(--np-surface);border-radius:20px;padding:16px;text-align:left;margin:12px 0}.np-media-companion>span,.np-media-idle>span{flex:1;min-width:0}.np-media-companion strong,.np-media-companion small,.np-media-idle strong,.np-media-idle small{display:block}.np-media-companion small,.np-media-idle small{font-size:12px;color:var(--np-muted);margin-top:3px}.np-media-companion button{background:var(--np-bg);border-radius:14px;padding:10px 12px;font-size:12px}.np-media-idle svg:last-child{margin-left:auto}
 @media(max-width:520px){.np-now-playing{grid-template-columns:64px 1fr 44px;gap:12px}.np-now-playing>img,.np-media-placeholder{width:64px;height:64px;border-radius:14px}.np-now-playing-copy>strong{font-size:15px}.np-media-art{border-radius:17px}}
+
+/* Media refinement */
+.np-media-detail{padding:2px 0 4px}
+.np-media-detail-tv .np-media-art{width:min(100%,520px);aspect-ratio:16/9}
+.np-media-detail-speaker .np-media-art{width:min(46vw,260px);aspect-ratio:1;border-radius:22px}
+.np-media-detail-speaker .np-media-meta{margin-top:2px}
+.np-media-detail-speaker .np-media-transport{margin:16px 0 18px}
+.np-tv-hardware{border-top:1px solid var(--np-line);margin-top:24px;padding:20px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.np-tv-hardware>div:first-child{display:flex;align-items:center;gap:12px;min-width:0}.np-tv-hardware span{min-width:0}.np-tv-hardware strong,.np-tv-hardware small{display:block}.np-tv-hardware small{font-size:12px;color:var(--np-muted);margin-top:2px}.np-tv-hardware-actions{display:flex;gap:8px}.np-tv-hardware-actions button{background:var(--np-bg);border-radius:13px;padding:9px 11px;font-size:12px}
+@media(max-width:520px){.np-media-detail-speaker .np-media-art{width:min(62vw,240px)}.np-tv-hardware{align-items:flex-start;flex-direction:column}.np-tv-hardware-actions{width:100%}.np-tv-hardware-actions button{flex:1}}
