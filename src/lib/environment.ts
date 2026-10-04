@@ -17,13 +17,12 @@ export function reportedAt(entity?: HAEntity) {
   return entity?.last_reported || entity?.last_updated;
 }
 export function outdoorReading(states: HAStateMap, kind: 'temperature'|'humidity', now=Date.now()) {
-  const local=states[`sensor.front_door_outdoor_${kind}`];
+  const local=states[`sensor.front_door_outdoor_weather_${kind}`];
   const value=sensorValue(local);
   const timestamp=Date.parse(reportedAt(local)||'');
   // A recent report, not just a retained numeric value, is required for the
   // battery outdoor sensor. last_updated alone can predate unchanged reports.
-  const disconnected = states['binary_sensor.front_door_outdoor_connectivity']?.state === 'off';
-  if(!disconnected && value!==null && Number.isFinite(timestamp) && now-timestamp>=0 && now-timestamp<6*60*60*1000) return {value,source:'Outdoor sensor',fallback:false};
+  if( value!==null && Number.isFinite(timestamp) && now-timestamp>=0 && now-timestamp<6*60*60*1000) return {value,source:'Front Door sensor',fallback:false};
   const weather=states['weather.forecast_home'];
   const weatherValue=weather && !['unavailable','unknown'].includes(weather.state) ? numeric(weather.attributes[kind]) : null;
   const converted=kind==='temperature' && weather?.attributes.temperature_unit==='°F' && weatherValue!==null ? (weatherValue-32)*5/9 : weatherValue;

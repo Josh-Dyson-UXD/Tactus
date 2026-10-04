@@ -4,7 +4,9 @@ import type { HAStateMap } from './ha-client';
 import { commandFor, confirms } from './home-control';
 import { parseForecast, type ForecastType } from './forecast';
 import type { Change, Command } from './home-control';
-export type HomeEvent = { id: number; title: string; time: string; status: 'pending'|'confirmed'|'accepted'|'error'; detail: string };
+import { retainCommandEvents, type HomeEvent } from './command-events';
+import { supportsMediaAction } from './media-control';
+export type { HomeEvent } from './command-events';
 
 export function useHome() {
   const [states, setStates] = useState<HAStateMap>({});
@@ -54,8 +56,11 @@ export function useHome() {
     if (!commands.length || !ready.current || commands.some(c=>busy.current.has(c.id))) return;
     const id = ++eventId.current;
     commands.forEach(c=>busy.current.add(c.id)); setPending(new Set(busy.current));
-    setEvents(old=>[{id,title,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),status:'pending',detail:'Sending to Home Assistant…'},...old].slice(0,100));
+    setEvents(old=>retainCommandEvents([{id,title,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),status:'pending',detail:'Sending to Home Assistant…'},...old]));
     const results = await Promise.allSettled(commands.map(async c => {
+      if (c.domain === 'media_player' && !supportsMediaAction(current.current[c.id], c.service)) {
+        throw Error('This media action is no longer supported or the player is unavailable.');
+      }
       await client.current!.requestService(c.domain,c.service,c.data,{entity_id:c.id});
       if (!c.expected) return 'accepted';
       // State events are authoritative. Poll the local event snapshot and do

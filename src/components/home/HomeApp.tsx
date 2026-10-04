@@ -5,6 +5,8 @@ import { mapHAStatesToRooms, mapHAStatesToScenes, mapHAStatesToAutomations, HA_E
 import { compareRooms } from '@/lib/room-order';
 import './home.css';
 import { useHome } from '@/lib/use-home';
+import { supportsMediaAction } from '@/lib/media-control';
+import { visibleCommandError } from '@/lib/command-events';
 import { LiveRange } from './LiveRange';
 import { EnvironmentDetail } from './EnvironmentDetail';
 import { EnvironmentSnapshot } from './EnvironmentSnapshot';
@@ -12,6 +14,7 @@ import { EnvironmentSnapshot } from './EnvironmentSnapshot';
 const unavailable = (e?: HAEntity) => !e || ['unavailable', 'unknown'].includes(e.state);
 const name = (e?: HAEntity) => String(e?.attributes.friendly_name || e?.entity_id || 'Device').trim();
 const display = (e?: HAEntity, unit = '') => { if (unavailable(e)) return 'Unavailable'; const n = Number(e!.state); return `${e!.state.trim() !== '' && Number.isFinite(n) ? n.toLocaleString([], { maximumFractionDigits: unit === '%' ? 0 : 1 }) : e!.state.replaceAll('_', ' ')}${unit}`; };
+const includedInTactus = (e: HAEntity) => e.entity_id !== 'media_player.ghost_media_player';
 const when = (value: unknown) => value && Number.isFinite(Date.parse(String(value))) ? new Date(String(value)).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No recorded run';
 type Change = { id: string; state?: string; attributes?: Record<string, unknown> };
 type Plan = { name: string; changes: Change[]; notes?: string; action?: {id:string;service:string;data?:Record<string,unknown>} };
@@ -23,7 +26,8 @@ export default function HomeApp() {
   const [detail, setDetail] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const [dismissedEvent, setDismissedEvent] = useState<number | null>(null);
+  const [dismissedErrors, setDismissedErrors] = useState<Set<number>>(() => new Set());
+  const commandError = visibleCommandError(events, dismissedErrors);
   const [plan, setPlan] = useState<Plan | null>(null);
   // Local media clock: HA reports an authoritative media_position plus the
   // timestamp it was measured at. Advance that position locally while
@@ -56,8 +60,8 @@ export default function HomeApp() {
   const automations = useMemo(() => mapHAStatesToAutomations(states), [states]);
   const lights = Object.values(states).filter(e => isLightingEntity(e.entity_id));
   const room = rooms.find(r => r.id === roomId);
-  const entity = detail ? states[detail] : undefined;
-  const controls = Object.values(states).filter(e => /^(light|switch|climate|cover|lock|select|number|button|media_player|sensor|binary_sensor)\./.test(e.entity_id));
+  const entity = detail && states[detail] && includedInTactus(states[detail]) ? states[detail] : undefined;
+  const controls = Object.values(states).filter(e => includedInTactus(e) && /^(light|switch|climate|cover|lock|select|number|button|media_player|sensor|binary_sensor)\./.test(e.entity_id));
   const navigate = (next: string) => { setPage(next); setRoomId(null); setDetail(null); setPlan(null); setQuery(''); setFilter('all'); };
   const change = (e: HAEntity, state: string) => apply(`${name(e)}: ${state}`, [{ id: e.entity_id, state }]);
   const attr = (e: HAEntity, key: string, value: unknown) => apply(`${name(e)} adjusted`, [{ id: e.entity_id, attributes: { [key]: value } }]);
@@ -71,7 +75,7 @@ export default function HomeApp() {
   const sensorBlock = (id: string) => { const cfg = INDOOR_AIR_SENSORS[id]; return cfg ? <div className="np-readings">{Object.entries(cfg).map(([kind, eid]) => <div key={eid}><small>{{ temp: 'Temperature', humidity: 'Humidity', co2: 'CO₂', pm25: 'PM2.5' }[kind]}</small><strong>{reading(eid, { temp: '°C', humidity: '%', co2: ' ppm', pm25: ' µg/m³' }[kind])}</strong></div>)}</div> : null; };
   const makeScene = (id: string) => service(name(states[id]), id, 'turn_on');
   const activeLights = lights.filter(e => e.state === 'on');
-  const mediaPlayers = Object.values(states).filter(e => e.entity_id.startsWith('media_player.'));
+  const mediaPlayers = Object.values(states).filter(e => includedInTactus(e) && e.entity_id.startsWith('media_player.'));
   const livingAppleTV = states['media_player.living_room_living_room'];
   const livingFrame = states['media_player.living_room_the_frame'];
   const bedroomHomePod = states['media_player.bedroom_bedroom'];
@@ -105,20 +109,23 @@ export default function HomeApp() {
     return `${base}${picture.startsWith('/') ? '' : '/'}${picture}`;
   };
   const mediaAction = (e: HAEntity, action: string, data: Record<string,unknown> = {}) => service(`${name(e)} ${action.replaceAll('_',' ')}`, e.entity_id, action, data);
+  const playbackAction = (e: HAEntity) => e.state === 'playing' ? 'media_pause' : 'media_play';
   const mediaTransport = (e: HAEntity) => <div className="np-media-transport">
-    <button aria-label="Previous" disabled={blocked(e)} onClick={()=>mediaAction(e,'media_previous_track')}><SkipBack size={20}/></button>
-    <button className="np-media-play" aria-label={e.state==='playing'?'Pause':'Play'} disabled={blocked(e)} onClick={()=>mediaAction(e,e.state==='playing'?'media_pause':'media_play')}>{e.state==='playing'?<Pause size={22}/>:<Play size={22}/>}</button>
-    <button aria-label="Next" disabled={blocked(e)} onClick={()=>mediaAction(e,'media_next_track')}><SkipForward size={20}/></button>
+    {supportsMediaAction(e,'media_previous_track') && <button aria-label="Previous" disabled={blocked(e)} onClick={()=>mediaAction(e,'media_previous_track')}><SkipBack size={20}/></button>}
+    {supportsMediaAction(e,playbackAction(e)) && <button className="np-media-play" aria-label={e.state==='playing'?'Pause':'Play'} disabled={blocked(e)} onClick={()=>mediaAction(e,playbackAction(e))}>{e.state==='playing'?<Pause size={22}/>:<Play size={22}/>}</button>}
+    {supportsMediaAction(e,'media_next_track') && <button aria-label="Next" disabled={blocked(e)} onClick={()=>mediaAction(e,'media_next_track')}><SkipForward size={20}/></button>}
   </div>;
   const nowPlayingCard = (e: HAEntity) => {
     const duration = Number(e.attributes.media_duration || 0);
     const position = mediaPosition(e);
     const artwork = mediaArtwork(e);
-    return <button className="np-now-playing" onClick={()=>open(e.entity_id)}>
-      {artwork ? <img src={artwork} alt="" /> : <span className="np-media-placeholder"><Tv size={24}/></span>}
-      <span className="np-now-playing-copy"><small>NOW PLAYING · {name(e)}</small><strong>{String(e.attributes.media_title || name(e))}</strong><span>{mediaSubtitle(e)}</span>{duration>0 && <span className="np-media-progress"><i style={{width:`${Math.min(100,position/duration*100)}%`}}/><em>{fmtTime(position)} / {fmtTime(duration)}</em></span>}</span>
-      <span className="np-now-playing-action" onClick={ev=>{ev.stopPropagation();mediaAction(e,e.state==='playing'?'media_pause':'media_play')}}>{e.state==='playing'?<Pause size={20}/>:<Play size={20}/>}</span>
-    </button>;
+    return <div className="np-now-playing" key={e.entity_id}>
+      <button className="np-now-playing-open" aria-label={`Open ${name(e)} media controls`} onClick={()=>open(e.entity_id)}>
+        {artwork ? <img src={artwork} alt="" /> : <span className="np-media-placeholder"><Tv size={24}/></span>}
+        <span className="np-now-playing-copy"><small>NOW PLAYING · {name(e)}</small><strong>{String(e.attributes.media_title || name(e))}</strong><span>{mediaSubtitle(e)}</span>{duration>0 && <span className="np-media-progress"><i style={{width:`${Math.min(100,position/duration*100)}%`}}/><em>{fmtTime(position)} / {fmtTime(duration)}</em></span>}</span>
+      </button>
+      {supportsMediaAction(e,playbackAction(e)) && <button className="np-now-playing-action" aria-label={`${e.state==='playing'?'Pause':'Play'} ${name(e)}`} disabled={blocked(e)} onClick={()=>mediaAction(e,playbackAction(e))}>{e.state==='playing'?<Pause size={20}/>:<Play size={20}/>}</button>}
+    </div>;
   };
   let content;
   if (!loaded) content = <>{heading('TACTUS', 'Your home, loading.', error || 'Connecting to Home Assistant…')}{error && <button className="np-primary" onClick={retry}>Try again</button>}</>;
@@ -148,9 +155,9 @@ export default function HomeApp() {
       <div className="np-media-meta"><strong>{String(entity.attributes.media_title || name(entity))}</strong><span>{mediaSubtitle(entity)}</span></div>
       {Number(entity.attributes.media_duration || 0)>0 && <div className="np-media-timeline"><div><i style={{width:`${Math.min(100,mediaPosition(entity)/Number(entity.attributes.media_duration)*100)}%`}}/></div><span>{fmtTime(mediaPosition(entity))} <b>/</b> {fmtTime(entity.attributes.media_duration)}</span></div>}
       {mediaTransport(entity)}
-      {entity.attributes.volume_level != null && <label className="np-range"><span className="np-media-volume-label"><Volume2 size={17}/> Volume</span><output>{Math.round(Number(entity.attributes.volume_level)*100)}%</output><LiveRange aria-label="Volume" type="range" min="0" max="1" step=".01" value={Number(entity.attributes.volume_level)} disabled={blocked(entity)} onChange={e=>mediaAction(entity,'volume_set',{volume_level:Number(e.target.value)})}/></label>}
-      {Array.isArray(entity.attributes.source_list) && (entity.attributes.source_list as string[]).length>0 && <label className="np-field">Source<select value={String(entity.attributes.source || entity.attributes.app_name || '')} disabled={blocked(entity)} onChange={e=>mediaAction(entity,'select_source',{source:e.target.value})}><option value="">Choose…</option>{(entity.attributes.source_list as string[]).map(source=><option key={source} value={source}>{source}</option>)}</select></label>}
-      {isLivingMedia && livingFrame && <div className="np-tv-hardware"><div><Tv size={19}/><span><strong>Television</strong><small>{livingFrame.state} · {String(livingFrame.attributes.source || 'HDMI')}</small></span></div><div className="np-tv-hardware-actions"><button disabled={blocked(livingFrame)} onClick={()=>mediaAction(livingFrame,livingFrame.attributes.is_volume_muted?'volume_mute':'volume_mute',{is_volume_muted:!livingFrame.attributes.is_volume_muted})}>{livingFrame.attributes.is_volume_muted?'Unmute':'Mute'}</button><button onClick={()=>open(livingFrame.entity_id)}>More</button></div></div>}
+      {supportsMediaAction(entity,'volume_set') && entity.attributes.volume_level != null && <label className="np-range"><span className="np-media-volume-label"><Volume2 size={17}/> Volume</span><output>{Math.round(Number(entity.attributes.volume_level)*100)}%</output><LiveRange aria-label="Volume" type="range" min="0" max="1" step=".01" value={Number(entity.attributes.volume_level)} disabled={blocked(entity)} onChange={e=>mediaAction(entity,'volume_set',{volume_level:Number(e.target.value)})}/></label>}
+      {supportsMediaAction(entity,'select_source') && Array.isArray(entity.attributes.source_list) && (entity.attributes.source_list as string[]).length>0 && <label className="np-field">Source<select value={String(entity.attributes.source || entity.attributes.app_name || '')} disabled={blocked(entity)} onChange={e=>mediaAction(entity,'select_source',{source:e.target.value})}><option value="">Choose…</option>{(entity.attributes.source_list as string[]).map(source=><option key={source} value={source}>{source}</option>)}</select></label>}
+      {isLivingMedia && livingFrame && <div className="np-tv-hardware"><div><Tv size={19}/><span><strong>Television</strong><small>{livingFrame.state} · {String(livingFrame.attributes.source || 'HDMI')}</small></span></div><div className="np-tv-hardware-actions">{supportsMediaAction(livingFrame,'volume_mute') && <button disabled={blocked(livingFrame)} onClick={()=>mediaAction(livingFrame,'volume_mute',{is_volume_muted:!livingFrame.attributes.is_volume_muted})}>{livingFrame.attributes.is_volume_muted?'Unmute':'Mute'}</button>}<button onClick={()=>open(livingFrame.entity_id)}>More</button></div></div>}
     </div>}
     </div></>;
   } else if (room) content = <>{back(() => setRoomId(null), 'Rooms')}{heading('YOUR SPACE', room.name)}{room.id==='living' && livingAppleTV && <><div className="np-section"><h2>Media</h2></div>{mediaActive(livingAppleTV)?nowPlayingCard(livingAppleTV):<button className="np-media-idle" onClick={()=>open(livingAppleTV.entity_id)}><Tv size={22}/><span><strong>Living Room</strong><small>Apple TV {livingAppleTV.state} · The Frame {livingFrame?.state || 'unavailable'}</small></span><ChevronRight size={18}/></button>}</>}{room.id==='bedroom' && bedroomHomePod && <><div className="np-section"><h2>Media</h2></div>{mediaActive(bedroomHomePod)?nowPlayingCard(bedroomHomePod):<button className="np-media-idle" onClick={()=>open(bedroomHomePod.entity_id)}><Speaker size={22}/><span><strong>Bedroom HomePod</strong><small>{bedroomHomePod.state} · volume {Math.round(Number(bedroomHomePod.attributes.volume_level||0)*100)}%</small></span><ChevronRight size={18}/></button>}</>}{sensorBlock(room.id)}<div className="np-section"><h2>Lighting</h2>{room.lights.length > 0 && <button disabled={!connected || !room.lights.some(l=>states[l.id]?.state==='on') || room.lights.some(l=>pending.has(l.id))} onClick={() => apply(`Turn off ${room.name} lights`, room.lights.filter(l => states[l.id]?.state==='on').map(l => ({ id:l.id,state:'off' })))}>All off</button>}</div><div className="np-panel">{room.lights.length ? room.lights.map(l => deviceRow(states[l.id])) : <p>No lights assigned to this room.</p>}</div>{room.switches.length > 0 && <><h2>Power points</h2><div className="np-panel">{room.switches.map(s => deviceRow(states[s.id]))}</div></>}{room.climate.length > 0 && <><h2>Climate</h2><div className="np-panel">{room.climate.map(c => deviceRow(states[c.id]))}</div></>}<button className="np-text" onClick={() => navigate('devices')}>Find another device <ArrowUpRight size={16} /></button></>;
@@ -179,5 +186,5 @@ export default function HomeApp() {
   else if (page === 'routines') content = <>{heading('LET HOME HELP','Your routines.',`${scenes.length} scenes · ${automations.length} automations`)}<h2>Scenes</h2><div className="np-scenes">{scenes.map(s=><button key={s.id} disabled={!connected || pending.has(s.id) || states[s.id]?.state==='unavailable'} onClick={()=>makeScene(s.id)}><Sparkles size={23}/><strong>{s.name}</strong><ArrowUpRight size={16}/></button>)}</div><h2>Automations</h2><div className="np-panel">{automations.map(a=><div className="np-automation" key={a.id}><div><strong>{a.name}</strong><small>{a.state==='off'?'Disabled':a.state==='unavailable'?'Unavailable':`Last run: ${when(a.lastTriggered)}`}</small></div><div className="np-actions">{toggle(states[a.id])}<button disabled={blocked(states[a.id])} onClick={()=>service(`Run ${a.name}`,a.id,'trigger',{skip_condition:true})}>Run now</button></div></div>)}</div><p className="np-caption">Edit triggers, conditions and actions in Home Assistant.</p></>;
   else content = null;
 
-  return <div className={`np-app np-${theme}`}><div className="np-shell"><header className="np-top"><button onClick={()=>navigate('now')}><House size={19}/> Tactus</button><div><button aria-label="Change theme" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}><Sun size={20}/></button></div></header>{error && <div className="np-connection" role="status"><span>{error}{loaded ? ' Showing last known readings.' : ''}</span><button onClick={retry}>Retry</button></div>}<main className="np-main">{content}</main>{events[0]?.status==='error' && dismissedEvent!==events[0].id && page!=='activity' && <div className="np-command-toast" role="alert"><div><strong>{events[0].title}</strong><span>{events[0].detail}</span></div><button aria-label="Dismiss error" onClick={()=>setDismissedEvent(events[0].id)}>×</button></div>}<nav className="np-nav" aria-label="Main navigation">{[['now','Now',House],['rooms','Rooms',LayoutGrid],['energy','Energy',Zap],['routines','Routines',Sparkles]].map(([id,label,Icon]:any)=><button key={id} aria-current={page===id || id==='rooms'&&page==='devices' ? 'page':undefined} onClick={()=>navigate(id)}><Icon size={21}/><span>{label}</span></button>)}</nav></div></div>;
+  return <div className={`np-app np-${theme}`}><div className="np-shell"><header className="np-top"><button onClick={()=>navigate('now')}><House size={19}/> Tactus</button><div><button aria-label="Change theme" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}><Sun size={20}/></button></div></header>{error && <div className="np-connection" role="status"><span>{error}{loaded ? ' Showing last known readings.' : ''}</span><button onClick={retry}>Retry</button></div>}<main className="np-main">{content}</main>{commandError && <div className="np-command-toast" role="alert"><div><strong>{commandError.title}</strong><span>{commandError.detail}</span></div><button aria-label="Dismiss error" onClick={()=>setDismissedErrors(old=>new Set([...old,commandError.id]))}>×</button></div>}<nav className="np-nav" aria-label="Main navigation">{[['now','Now',House],['rooms','Rooms',LayoutGrid],['energy','Energy',Zap],['routines','Routines',Sparkles]].map(([id,label,Icon]:any)=><button key={id} aria-current={page===id || id==='rooms'&&page==='devices' ? 'page':undefined} onClick={()=>navigate(id)}><Icon size={21}/><span>{label}</span></button>)}</nav></div></div>;
 }
