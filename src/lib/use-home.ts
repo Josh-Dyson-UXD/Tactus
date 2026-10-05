@@ -49,7 +49,8 @@ export function useHome() {
     const pageshow = (e: PageTransitionEvent) => { if (e.persisted) resume(); };
     document.addEventListener('visibilitychange',resume); window.addEventListener('online',resume); window.addEventListener('pageshow',pageshow);
     ha.connect();
-    return () => { mounted.current=false; ++generation.current; ready.current=false; offState();offConn();offAuth();ha.disconnect();document.removeEventListener('visibilitychange',resume);window.removeEventListener('online',resume);window.removeEventListener('pageshow',pageshow); };
+    const reportTimer=setInterval(()=>{if(ready.current && document.visibilityState!=='hidden') void refresh();},5*60000);
+    return () => { clearInterval(reportTimer); mounted.current=false; ++generation.current; ready.current=false; offState();offConn();offAuth();ha.disconnect();document.removeEventListener('visibilitychange',resume);window.removeEventListener('online',resume);window.removeEventListener('pageshow',pageshow); };
   },[refresh]);
 
   const run = useCallback(async (title: string, commands: Command[]) => {
@@ -92,5 +93,9 @@ export function useHome() {
     const result = await client.current.requestService('weather', 'get_forecasts', {type}, {entity_id:'weather.forecast_home'}, true);
     return parseForecast(result, 'weather.forecast_home');
   }, []);
-  return {states,loaded,connected,error,pending,events,apply,service,getForecast,retry:()=>client.current?.reconnect()};
+  const getHistory = useCallback((ids:string[], start:number, end:number) => {
+    if (!ready.current || !client.current) return Promise.reject(new Error('Reconnect to load room history.'));
+    return client.current.fetchHistory(ids,start,end);
+  }, []);
+  return {getHistory,states,loaded,connected,error,pending,events,apply,service,getForecast,retry:()=>client.current?.reconnect()};
 }

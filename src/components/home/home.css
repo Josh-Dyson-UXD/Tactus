@@ -40,3 +40,16 @@ body:has(.np-app){background:#f4f3ed}body:has(.np-dark){background:#181f22}
 
 .np-now-playing-open{display:grid;grid-template-columns:78px minmax(0,1fr);gap:15px;align-items:center;min-width:0;text-align:left;width:100%}.np-now-playing-action:disabled{opacity:.4;cursor:default}.np-now-playing-open:focus-visible,.np-now-playing-action:focus-visible{outline:2px solid var(--np-fg);outline-offset:4px}
 @media(max-width:520px){.np-now-playing-open{grid-template-columns:64px minmax(0,1fr);gap:12px}}
+
+/* Advisory emphasis stays local to the affected room and always includes text. */
+.np-app{--np-watch:#f3e6c7;--np-watch-text:#674b1e;--np-attention:#f4d9ca;--np-attention-text:#73381f}
+.np-dark{--np-watch:#443d2b;--np-watch-text:#f0d79c;--np-attention:#493329;--np-attention-text:#ffceb3}
+.np-air-notice{background:var(--np-surface);border:1px solid var(--np-line);border-radius:18px;padding:16px;margin:10px 0;font-size:13px}
+.np-air-notice strong{font-weight:600}.np-air-notice p{margin-top:5px;line-height:1.6}
+.np-air-watch{background:var(--np-watch);color:var(--np-watch-text)!important}.np-air-attention{background:var(--np-attention);color:var(--np-attention-text)!important}
+section.np-air-attention{background:transparent;color:var(--np-fg)!important}
+.np-air-attention>button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+.np-room-grid>.np-room-watch{box-shadow:inset 0 0 0 2px var(--np-watch-text)}.np-room-grid>.np-room-attention{box-shadow:inset 0 0 0 2px var(--np-attention-text)}
+.np-room-grid .np-room-air-badge{color:var(--np-watch-text);font-weight:600;font-size:11px}.np-room-attention .np-room-air-badge{color:var(--np-attention-text)}
+.np-air-trends{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.np-air-trend{background:var(--np-surface);border-radius:18px;padding:16px;min-width:0}.np-air-trend h3{margin:0;font-size:13px;font-weight:600}.np-air-trend h3 small{display:block;font-weight:400;color:var(--np-muted);margin-top:5px}.np-air-trend svg{display:block;width:100%;height:90px;color:var(--np-accent);margin-top:10px}.np-air-axis{display:flex;justify-content:space-between;font-size:10px;color:var(--np-muted)}.np-air-trend p{font-size:12px;color:var(--np-muted);margin-top:12px}.np-air-rules{margin:20px 0;font-size:12px;color:var(--np-muted)}.np-air-rules summary{cursor:pointer;min-height:44px;padding:12px 0}.np-air-rules p{margin:10px 0}.np-air-rules a{color:var(--np-accent)}
+@media(max-width:359px){.np-air-trends{grid-template-columns:1fr}}

@@ -120,3 +120,17 @@ test('forecast requests opt into response data and preserve the returned forecas
   sockets[0].message({type:'result',id:wire.id,success:true,result:response});
   assert.deepEqual(await result,response);
 });
+
+test('history uses a read-only request with bounded dates and entity IDs',async t=>{
+ const {client,sockets}=setup(t);client.connect();sockets[0].message({type:'auth_ok'});
+ const end=Date.parse('2026-10-05T04:00:00Z');const result=client.fetchHistory(['sensor.room'],end-86400000,end);
+ const wire=sockets[0].sent.at(-1);assert.equal(wire.type,'history/history_during_period');assert.deepEqual(wire.entity_ids,['sensor.room']);assert.equal(wire.start_time,'2026-10-04T04:00:00.000Z');assert.equal(wire.no_attributes,true);
+ sockets[0].message({type:'result',id:wire.id,success:true,result:{'sensor.room':[{s:'65',lu:end/1000}]}});
+ assert.equal((await result)['sensor.room'][0].s,'65');
+});
+
+test('equal state timestamps refresh report freshness without replacing cached attributes',()=>{
+ const old={entity_id:'sensor.room',state:'65',attributes:{source:'cached'},last_updated:'2026-10-05T01:00:00Z',last_reported:'2026-10-05T01:00:00Z'};
+ const fresh={...old,attributes:{source:'snapshot'},last_reported:'2026-10-05T04:00:00Z'};
+ const merged=mergeStates({'sensor.room':old},{'sensor.room':fresh})['sensor.room'];assert.equal(merged.last_reported,fresh.last_reported);assert.equal(merged.attributes.source,'cached');
+});
