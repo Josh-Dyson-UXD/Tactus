@@ -6,6 +6,7 @@ import { compareRooms } from '@/lib/room-order';
 import './home.css';
 import { useHome } from '@/lib/use-home';
 import { supportsMediaAction } from '@/lib/media-control';
+import { outdoorReading, sensorValue } from '@/lib/environment';
 import { visibleCommandError } from '@/lib/command-events';
 import { LiveRange } from './LiveRange';
 import { EnvironmentDetail } from './EnvironmentDetail';
@@ -21,6 +22,8 @@ type Plan = { name: string; changes: Change[]; notes?: string; action?: {id:stri
 
 export default function HomeApp() {
   const { states, loaded, connected, error, pending, events, apply, service, getForecast, retry } = useHome();
+  const [readingsNow, setReadingsNow] = useState(Date.now);
+  useEffect(() => { const timer = window.setInterval(() => setReadingsNow(Date.now()), 60000); return () => window.clearInterval(timer); }, []);
   const [page, setPage] = useState('now');
   const [roomId, setRoomId] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
@@ -73,6 +76,16 @@ export default function HomeApp() {
   const toggle = (e: HAEntity) => <button className="np-power" aria-label={`Toggle ${name(e)}`} aria-pressed={e.state === 'on'} disabled={blocked(e)} onClick={() => change(e, e.state === 'on' ? 'off' : 'on')}><Power size={19} /></button>;
   const deviceRow = (e: HAEntity) => <div className="np-device" key={e.entity_id}><button className="np-device-open" onClick={() => open(e.entity_id)}><span className="np-device-symbol">{isLightingEntity(e.entity_id) ? <Lightbulb size={21} /> : e.entity_id.startsWith('climate.') ? <Thermometer size={21} /> : <Plug size={21} />}</span><span><strong>{name(e)}</strong>{page==='devices' && <small>{e.entity_id}</small>}<small>{pending.has(e.entity_id) ? 'Updating…' : unavailable(e) ? 'Unavailable' : e.entity_id.startsWith('button.') ? `Last used: ${when(e.state)}` : display(e, String(e.attributes.unit_of_measurement || ''))}{e.state === 'on' && e.attributes.brightness != null ? ` · ${Math.round(Number(e.attributes.brightness) / 255 * 100)}%` : ''}</small></span></button>{/^(light|switch)\./.test(e.entity_id) ? toggle(e) : <button className="np-icon" aria-label={`Open ${name(e)}`} onClick={() => open(e.entity_id)}><ChevronRight size={20} /></button>}</div>;
   const sensorBlock = (id: string) => { const cfg = INDOOR_AIR_SENSORS[id]; return cfg ? <div className="np-readings">{Object.entries(cfg).map(([kind, eid]) => <div key={eid}><small>{{ temp: 'Temperature', humidity: 'Humidity', co2: 'CO₂', pm25: 'PM2.5' }[kind]}</small><strong>{reading(eid, { temp: '°C', humidity: '%', co2: ' ppm', pm25: ' µg/m³' }[kind])}</strong></div>)}</div> : null; };
+  const roomReadings = (id: string) => {
+    const cfg = INDOOR_AIR_SENSORS[id];
+    if (!cfg && id !== 'front') return 'Open room';
+    const outsideTemperature = id === 'front' ? outdoorReading(states,'temperature',readingsNow) : null;
+    const outsideHumidity = id === 'front' ? outdoorReading(states,'humidity',readingsNow) : null;
+    const temperature = id === 'front' ? (outsideTemperature?.fallback === false && outsideTemperature.source === 'Front Door sensor' ? outsideTemperature.value : null) : sensorValue(states[cfg.temp]);
+    const humidity = id === 'front' ? (outsideHumidity?.fallback === false && outsideHumidity.source === 'Front Door sensor' ? outsideHumidity.value : null) : sensorValue(states[cfg.humidity]);
+    const format = (value: number | null, digits: number) => value === null ? '—' : value.toLocaleString([], {maximumFractionDigits:digits});
+    return <span aria-label={`Temperature ${temperature === null ? 'unavailable' : `${format(temperature,1)} degrees Celsius`}; humidity ${humidity === null ? 'unavailable' : `${format(humidity,0)} percent`}`}>{format(temperature,1)}°C · {format(humidity,0)}%</span>;
+  };
   const makeScene = (id: string) => service(name(states[id]), id, 'turn_on');
   const activeLights = lights.filter(e => e.state === 'on');
   const mediaPlayers = Object.values(states).filter(e => includedInTactus(e) && e.entity_id.startsWith('media_player.'));
@@ -172,7 +185,7 @@ export default function HomeApp() {
     <button className="np-energy-link" onClick={() => navigate('energy')}><Battery size={19}/><span>Powerwall {reading(HA_ENTITIES.powerwallCharge,'%')}</span><ArrowUpRight size={17}/></button>
     </>;
   else if (page === 'inside' || page === 'outside') content = <>{back(()=>navigate('now'),'Home')}<EnvironmentDetail kind={page} states={states} connected={connected} getForecast={getForecast}/></>;
-  else if (page === 'rooms') content = <>{heading('YOUR SPACES','Every room.','Lighting, climate and readings, together.')}<div className="np-room-grid">{rooms.map(r => <button key={r.id} onClick={() => setRoomId(r.id)}><House size={23}/><strong>{r.name}</strong><small>{r.lights.length ? `${r.lights.filter(l=>l.cardState==='on').length} of ${r.lights.length} lights on` : 'Sensors'}{r.lights.some(l=>l.cardState==='error') ? ' · unavailable' : ''}</small><span>{INDOOR_AIR_SENSORS[r.id] ? reading(INDOOR_AIR_SENSORS[r.id].temp,'°') : 'Open room'}<ArrowUpRight size={16}/></span></button>)}</div><button className="np-primary" onClick={() => navigate('devices')}><Search size={18}/> Find any device</button></>;
+  else if (page === 'rooms') content = <>{heading('YOUR SPACES','Every room.','Lighting, climate and readings, together.')}<div className="np-room-grid">{rooms.map(r => <button key={r.id} onClick={() => setRoomId(r.id)}><House size={23}/><strong>{r.name}</strong><small>{r.lights.length ? `${r.lights.filter(l=>l.cardState==='on').length} of ${r.lights.length} lights on` : 'Sensors'}{r.lights.some(l=>l.cardState==='error') ? ' · unavailable' : ''}</small><span>{roomReadings(r.id)}<ArrowUpRight size={16}/></span></button>)}</div><button className="np-primary" onClick={() => navigate('devices')}><Search size={18}/> Find any device</button></>;
   else if (page === 'devices') {
     const list = controls.filter(e => (!query || `${name(e)} ${e.entity_id}`.toLowerCase().includes(query.toLowerCase())) && (filter==='all' || filter==='unavailable' ? filter!=='unavailable' || unavailable(e) : filter==='light' ? isLightingEntity(e.entity_id) : filter==='switch' ? e.entity_id.startsWith('switch.') && !isLightingEntity(e.entity_id) : e.entity_id.startsWith(filter+'.')));
     content = <>{back(() => window.history.back(),'Back')}{heading('DEVICE LIBRARY','Everything, found.',`${controls.length} controls and readings from Home Assistant`)}<label className="np-search"><Search size={19}/><input aria-label="Find a device" placeholder="Name, room or device…" value={query} onChange={e=>setQuery(e.target.value)}/></label><label className="np-field">Show<select value={filter} onChange={e=>setFilter(e.target.value)}>{['all','light','switch','climate','cover','lock','select','number','button','media_player','sensor','binary_sensor','unavailable'].map(v=><option key={v} value={v}>{v.replaceAll('_',' ')}</option>)}</select></label><p className="np-caption">Search lights, power points, climate and sensors across your home.</p><div className="np-panel">{list.map(deviceRow)}{!list.length && <p>No matching devices.</p>}</div></>;
