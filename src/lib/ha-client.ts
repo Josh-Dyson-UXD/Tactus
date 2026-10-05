@@ -27,6 +27,10 @@ export function mergeStates(cached: HAStateMap, fetched: HAStateMap): HAStateMap
     const existingTime = Date.parse(existing.last_updated);
     if (Number.isNaN(fetchedTime) || Number.isNaN(existingTime)) continue;
     if (fetchedTime > existingTime) merged[id] = entity;
+    else if (fetchedTime === existingTime && Date.parse(entity.last_reported || '') > Date.parse(existing.last_reported || existing.last_updated)) {
+      // An unchanged measurement can be freshly reported without a state event.
+      merged[id] = {...existing, last_reported:entity.last_reported};
+    }
   }
   return merged;
 }
@@ -68,6 +72,16 @@ export class HAClient {
       this.requests.set(id, { resolve, reject, timer });
       try { this.ws!.send(JSON.stringify({ id, type: "call_service", domain, service, service_data: serviceData, target, ...(returnResponse ? { return_response: true } : {}) })); }
       catch { clearTimeout(timer); this.requests.delete(id); reject(new Error("Command could not be sent.")); }
+    });
+  }
+  fetchHistory(entityIds: string[], start: number, end: number): Promise<unknown> {
+    if (!this.authenticated || !this.ws || this.ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error('Reconnect to load room history.'));
+    const id = this.msgId++;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { this.requests.delete(id); reject(new Error('Room history took too long to load.')); }, 20000);
+      this.requests.set(id, {resolve, reject, timer});
+      try { this.ws!.send(JSON.stringify({id, type:'history/history_during_period', entity_ids:entityIds, start_time:new Date(start).toISOString(), end_time:new Date(end).toISOString(), minimal_response:true, no_attributes:true, significant_changes_only:false})); }
+      catch { clearTimeout(timer); this.requests.delete(id); reject(new Error('Unable to request room history.')); }
     });
   }
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
