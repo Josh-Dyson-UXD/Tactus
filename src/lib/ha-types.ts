@@ -385,6 +385,7 @@ export const isLightingEntity = (id: string) => isLightEntity(id) || id === HA_E
 
 const LIGHT_ROOM_OVERRIDE: Record<string, string> = {
   "light.shiraz": "living",
+  "light.bedroom_kids_room": "kids",
   [HA_ENTITIES.donutSwitch]: "living",
 };
 
