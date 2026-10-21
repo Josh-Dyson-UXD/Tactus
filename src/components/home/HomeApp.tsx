@@ -87,10 +87,11 @@ export default function HomeApp() {
   const sensorBlock = (id: string) => { const cfg = INDOOR_AIR_SENSORS[id]; return cfg ? <div className="np-readings">{Object.entries(cfg).map(([kind, eid]) => <div key={eid}><small>{{ temp: 'Temperature', humidity: 'Humidity', co2: 'CO₂', pm25: 'PM2.5' }[kind]}</small><strong>{reading(eid, { temp: '°C', humidity: '%', co2: ' ppm', pm25: ' µg/m³' }[kind])}</strong></div>)}</div> : null; };
   const roomReadings = (id: string) => {
     const cfg = INDOOR_AIR_SENSORS[id];
-    if (!cfg) return 'Open room';
-    if (!cfg) return 'Open room';
-    const temperature = sensorValue(states[cfg.temp]);
-    const humidity = sensorValue(states[cfg.humidity]);
+    if (!cfg && id !== 'front') return 'Open room';
+    const outsideTemperature = id === 'front' ? outdoorReading(states,'temperature',readingsNow) : null;
+    const outsideHumidity = id === 'front' ? outdoorReading(states,'humidity',readingsNow) : null;
+    const temperature = id === 'front' ? (outsideTemperature?.source === 'Outside · Netatmo' ? outsideTemperature.value : null) : sensorValue(states[cfg.temp]);
+    const humidity = id === 'front' ? (outsideHumidity?.source === 'Outside · Netatmo' ? outsideHumidity.value : null) : sensorValue(states[cfg.humidity]);
     const format = (value: number | null, digits: number) => value === null ? '—' : value.toLocaleString([], {maximumFractionDigits:digits});
     return <span aria-label={`Temperature ${temperature === null ? 'unavailable' : `${format(temperature,1)} degrees Celsius`}; humidity ${humidity === null ? 'unavailable' : `${format(humidity,0)} percent`}`}>{format(temperature,1)}°C · {format(humidity,0)}%</span>;
   };
