@@ -4,11 +4,11 @@ import {parseAirHistory,dewPoint,moistureAdvice,roomAirNotices,HOUR,sustainedMin
 const now=Date.parse('2026-10-05T04:00:00Z');
 const cfg={temp:'sensor.temp',humidity:'sensor.humidity',co2:'sensor.co2'};
 const entity=value=>({state:String(value),last_reported:new Date(now-60000).toISOString(),attributes:{}});
-const states={ 'sensor.temp':entity(20),'sensor.humidity':entity(65),'sensor.co2':entity(1600),'sensor.front_door_outdoor_weather_temperature':entity(10),'sensor.front_door_outdoor_weather_humidity':entity(90)};
+const states={ 'sensor.temp':entity(20),'sensor.humidity':entity(65),'sensor.co2':entity(1600),'sensor.kitchen_kitchen_temperature':entity(10),'sensor.kitchen_kitchen_humidity':entity(90)};
 const history={'sensor.humidity':[{time:now-3*HOUR,value:65}],'sensor.co2':[{time:now-HOUR,value:1600}]};
 test('cool high-RH outside air can still be drier; warm outside air can add moisture',()=>{
  assert.ok(dewPoint(10,90)<dewPoint(20,65));assert.match(moistureAdvice(states,cfg,now),/drier/);
- assert.match(moistureAdvice({...states,'sensor.front_door_outdoor_weather_temperature':entity(25)},cfg,now),/more moisture/);
+ assert.match(moistureAdvice({...states,'sensor.kitchen_kitchen_temperature':entity(25)},cfg,now),/more moisture/);
  assert.equal(dewPoint(10,0),null);assert.equal(dewPoint(10,101),null);
 });
 test('persistence uses history and unknown intervals reset the duration',()=>{

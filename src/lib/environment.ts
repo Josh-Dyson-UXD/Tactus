@@ -16,13 +16,16 @@ export function formatRange(values: (number | null)[], unit: string, digits = 0)
 export function reportedAt(entity?: HAEntity) {
   return entity?.last_reported || entity?.last_updated;
 }
+// Physical placements confirmed by Josh, 21 October 2026. Entity IDs retain old names.
+export const OUTDOOR_SENSORS = {temperature:'sensor.kitchen_kitchen_temperature', humidity:'sensor.kitchen_kitchen_humidity'};
+export const BEDROOM_COMPARISON = {temp:'sensor.front_door_outdoor_weather_temperature',humidity:'sensor.front_door_outdoor_weather_humidity'};
 export function outdoorReading(states: HAStateMap, kind: 'temperature'|'humidity', now=Date.now()) {
-  const local=states[`sensor.front_door_outdoor_weather_${kind}`];
+  const local=states[OUTDOOR_SENSORS[kind]];
   const value=sensorValue(local);
   const timestamp=Date.parse(reportedAt(local)||'');
   // A recent report, not just a retained numeric value, is required for the
   // battery outdoor sensor. last_updated alone can predate unchanged reports.
-  if( value!==null && Number.isFinite(timestamp) && now-timestamp>=0 && now-timestamp<6*60*60*1000) return {value,source:'Front Door sensor',fallback:false};
+  if( value!==null && Number.isFinite(timestamp) && now-timestamp>=0 && now-timestamp<6*60*60*1000) return {value,source:'Outside · Netatmo',fallback:false};
   const weather=states['weather.forecast_home'];
   const weatherValue=weather && !['unavailable','unknown'].includes(weather.state) ? numeric(weather.attributes[kind]) : null;
   const converted=kind==='temperature' && weather?.attributes.temperature_unit==='°F' && weatherValue!==null ? (weatherValue-32)*5/9 : weatherValue;

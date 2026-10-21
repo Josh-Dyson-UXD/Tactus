@@ -37,3 +37,13 @@ test('unknown numeric values cannot count as confirmed',()=>{
  assert.equal(confirms(entity('climate.room','heat',{temperature:null}),{id:'climate.room',attributes:{temperature:0}}),false);
  assert.equal(confirms(entity('number.limit','80.0'),{id:'number.limit',state:'80'}),true);
 });
+
+test('climate quick power preserves settings and confirms any active mode',()=>{
+ const e={entity_id:'climate.split',state:'off',attributes:{supported_features:425,temperature:19,fan_mode:'low'}};
+ const command=commandFor({id:e.entity_id,state:'on'},e);
+ assert.equal(command.service,'turn_on');assert.deepEqual(command.data,{});
+ assert.equal(confirms({...e,state:'cool'},command.expected),true);
+ assert.equal(confirms(e,command.expected),false);
+ assert.equal(commandFor({id:e.entity_id,state:'off'},e).service,'turn_off');
+ assert.throws(()=>commandFor({id:e.entity_id,state:'on'},{...e,attributes:{supported_features:1}}),/not supported/);
+});

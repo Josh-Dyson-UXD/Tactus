@@ -1,3 +1,4 @@
+import { SensorComparison } from './SensorComparison';
 import { useEffect, useState } from 'react';
 import { CloudSun, Droplets, Wind } from 'lucide-react';
 import type { HAStateMap } from '@/lib/ha-client';
@@ -41,7 +42,7 @@ export function EnvironmentDetail({kind,states,connected,getForecast}:Props) {
       return <article className="np-condition-room" key={room.id}><h2>{room.name}</h2>{cfg ? <dl>{Object.entries(cfg).map(([key,id])=>{
         const entity=states[id];const value=entity && !['unavailable','unknown'].includes(entity.state)?numeric(entity.state):null;
         return metric(({temp:'Temperature',humidity:'Humidity',co2:'CO₂',pm25:'PM2.5'} as Record<string,string>)[key],formatRange([value],({temp:'°C',humidity:'%',co2:' ppm',pm25:' µg/m³'} as Record<string,string>)[key],key==='temp'||key==='pm25'?1:0));
-      })}</dl>:<p>No room sensor set up</p>}</article>;
+      })}</dl>:<p>No room sensor set up</p>}{room.id==='bedroom' && <SensorComparison states={states}/>}</article>;
     })}<p className="np-caption">CO₂ and PM2.5 measure different aspects of air quality. Unavailable readings are not included in the home summary.</p></div> : <>
       <div className="np-weather-current"><CloudSun size={30}/><strong>{formatRange([temperature.value],'°C',1)}</strong><p>{temperature.source}</p><dl>{metric('Humidity',formatRange([humidity.value],'%'))}{metric('Wind',formatRange([weatherNumber('wind_speed')],` ${units.wind}`,1))}{metric('UV index',formatRange([weatherNumber('uv_index')],'',1))}{metric('Pressure',formatRange([weatherNumber('pressure')],` ${String(a.pressure_unit || 'hPa')}`,1))}</dl><p>Humidity: {humidity.source}. Wind, UV and pressure: weather service.</p></div>
       <div className="np-section"><h2>Forecast</h2>{types.length>1 && <div className="np-forecast-tabs" aria-label="Forecast period">{types.map(t=><button key={t} aria-pressed={type===t} onClick={()=>setSelection(t)}>{t==='hourly'?'Hourly':t==='daily'?'Daily':'Day / night'}</button>)}</div>}</div>
