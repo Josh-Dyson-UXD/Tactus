@@ -101,11 +101,6 @@ export function isClimateEntity(id: string) { return CLIMATE_IDS.has(id); }
 // battery swap) is a trigger to re-check this map against Dev Tools →
 // States, not just the automations that reference the same entities.
 export const INDOOR_AIR_SENSORS: Record<string, { temp: string; humidity: string; co2?: string; pm25?: string }> = {
-  kitchen: {
-    temp:     "sensor.kitchen_kitchen_temperature",
-    humidity: "sensor.kitchen_kitchen_humidity",
-    co2:      "sensor.kitchen_kitchen_carbon_dioxide",
-  },
   bedroom: {
     temp:     "sensor.bedroom_bedroom_temperature",
     humidity: "sensor.bedroom_bedroom_humidity",

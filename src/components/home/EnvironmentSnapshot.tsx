@@ -5,7 +5,7 @@ import { INDOOR_AIR_SENSORS } from '@/lib/ha-types';
 import { formatRange, outdoorReading, sensorValue } from '@/lib/environment';
 
 const ROOM_NAMES: Record<string,string> = { living:'Living Room',kitchen:'Kitchen',bedroom:'Bedroom',kids:'Kids Room' };
-const ORDER=['living','kitchen','bedroom','kids'];
+const ORDER=['living','bedroom','kids'];
 export function EnvironmentSnapshot({states,onOpen}:{states:HAStateMap;onOpen:(kind:'inside'|'outside')=>void}) {
   const [now,setNow]=useState(Date.now);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer);},[]);

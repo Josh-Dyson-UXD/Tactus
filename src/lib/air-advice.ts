@@ -1,5 +1,5 @@
 import type { HAEntity, HAStateMap } from './ha-client.ts';
-import { numeric, reportedAt, sensorValue } from './environment.ts';
+import { numeric, reportedAt, sensorValue, OUTDOOR_SENSORS } from './environment.ts';
 export type Point = {time:number; value:number|null};
 export type AirHistory = Record<string,Point[]>;
 export type AirConfig = {temp:string;humidity:string;co2?:string;pm25?:string};
@@ -21,7 +21,7 @@ export function dewPoint(temp:number|null, humidity:number|null) {
 }
 export function moistureAdvice(states:HAStateMap,cfg:AirConfig,now:number) {
   const indoor=dewPoint(freshValue(states[cfg.temp],now),freshValue(states[cfg.humidity],now));
-  const outdoor=dewPoint(freshValue(states['sensor.front_door_outdoor_weather_temperature'],now),freshValue(states['sensor.front_door_outdoor_weather_humidity'],now));
+  const outdoor=dewPoint(freshValue(states[OUTDOOR_SENSORS.temperature],now),freshValue(states[OUTDOOR_SENSORS.humidity],now));
   if(indoor===null || outdoor===null) return 'Outside moisture comparison is unavailable.';
   if(outdoor<indoor-1) return 'Outside air is drier and may help reduce indoor moisture.';
   if(outdoor>indoor+1) return 'Outside air contains more moisture; airing may increase indoor humidity.';

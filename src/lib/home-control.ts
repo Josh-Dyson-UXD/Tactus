@@ -13,9 +13,15 @@ export function commandFor(change: Change, entity: HAEntity): Command {
     if ('rgb_color' in a) result.expected = undefined; // integrations may report xy/hs instead
   } else if (['switch','automation'].includes(domain) && ['on','off'].includes(change.state || '')) result.service = change.state === 'on' ? 'turn_on' : 'turn_off';
   else if (domain === 'climate') {
-    if (change.state) { result.service = 'set_hvac_mode'; result.data = { hvac_mode: change.state }; }
+    if (change.state === 'on' || change.state === 'off') {
+      const bit=change.state==='on'?128:256;
+      if (!(Number(entity.attributes.supported_features)&bit)) throw Error('Climate power control is not supported.');
+      result.service=change.state==='on'?'turn_on':'turn_off';
+    }
+    else if (change.state) { result.service = 'set_hvac_mode'; result.data = { hvac_mode: change.state }; }
     else if ('temperature' in a) { result.service = 'set_temperature'; result.data = a; }
     else if ('fan_mode' in a) { result.service = 'set_fan_mode'; result.data = a; }
+    else if ('swing_mode' in a) { result.service = 'set_swing_mode'; result.data = a; }
     else if ('preset_mode' in a) { result.service = 'set_preset_mode'; result.data = a; }
   } else if (domain === 'select') { result.service = 'select_option'; result.data = { option: change.state }; }
   else if (domain === 'number') { result.service = 'set_value'; result.data = { value: Number(change.state) }; }
@@ -30,6 +36,7 @@ export function commandFor(change: Change, entity: HAEntity): Command {
 }
 export function confirms(entity: HAEntity | undefined, expected: Change) {
   if (!entity || ['unavailable','unknown'].includes(entity.state)) return false;
+  if (expected.state==='on' && entity.entity_id.startsWith('climate.')) return ['cool','heat','dry','heat_cool','fan_only','auto'].includes(entity.state);
   if (expected.state !== undefined && entity.state !== expected.state && !(Number.isFinite(Number(expected.state)) && Number(entity.state) === Number(expected.state))) return false;
   return Object.entries(expected.attributes || {}).every(([key, value]) => {
     const actual = entity.attributes[key];
